@@ -1,7 +1,7 @@
 import yaml
 from pathlib import Path
 from .models import UIConfig, ActionsConfig
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict
 import logging
 import shutil
 
