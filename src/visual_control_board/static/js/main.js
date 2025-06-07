@@ -15,6 +15,9 @@ document.body.addEventListener('htmx:afterSwap', function(event) {
     }
 });
 
+// Client-side cache for live button states
+const liveButtonStates = {};
+
 // WebSocket for live button updates
 function connectWebSocket() {
     const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -26,10 +29,12 @@ function connectWebSocket() {
     };
 
     socket.onmessage = function(event) {
-        // console.log("WebSocket message received:", event.data); // Removed verbose log line
+        // console.log("WebSocket message received:", event.data); // Verbose log line removed
         try {
             const message = JSON.parse(event.data);
             if (message.type === "button_content_update" && message.payload) {
+                // Store the latest payload in our cache
+                liveButtonStates[message.payload.button_id] = message.payload;
                 updateButtonContent(message.payload);
             } else if (message.type === "navigation_update") {
                 console.log("Navigation update message received. Refreshing navigation panel.");
@@ -109,7 +114,6 @@ function updateButtonContent(data) {
     const buttonElement = document.getElementById(`btn-${buttonId}`);
     if (!buttonElement) {
         // This is an expected scenario if the button is on a page that is not currently visible.
-        // The warning is removed to avoid cluttering the console for this normal behavior.
         // console.warn(`Button element with id 'btn-${buttonId}' not found for update.`); 
         return;
     }
@@ -141,9 +145,12 @@ function updateButtonContent(data) {
             sparklineElement.style.display = 'none';
             sparklineElement.innerHTML = ''; // Clear its content
         }
-        // Optionally, restore a default icon or ensure icon is visible if no icon_class was provided to hide it
-        if (iconElement && !iconElement.className) { // If icon has no class, it might be hidden
-             // iconElement.style.display = 'none'; // Or set a default icon here
+        if (iconElement && !iconElement.className && !data.icon_class) { 
+            // If sparkline is cleared AND no new icon_class is provided,
+            // ensure the icon element doesn't re-appear if it was just an empty placeholder.
+            // However, if an icon_class was previously set, it should remain.
+            // This logic might need refinement based on desired behavior when clearing sparklines.
+            // For now, if icon_class is not in the current update, we don't touch the icon display.
         }
     }
 
@@ -192,26 +199,44 @@ function refreshNavigationPanel() {
     
     console.log(`Requesting navigation refresh from: ${refreshUrl}`);
     
-    // Use HTMX's JavaScript API to request and swap the navigation content
     htmx.ajax('GET', refreshUrl, {
-        target: '#page-navigation', // The element to be replaced
-        swap: 'outerHTML'          // Replace the entire <nav> element
+        target: '#page-navigation', 
+        swap: 'outerHTML'          
     }).then(() => {
-        // After the swap, the original #page-navigation element is gone, 
-        // and a new one (from the response) has taken its place.
-        // We need to tell HTMX to process this new element.
         const newNavElement = document.getElementById('page-navigation');
         if (newNavElement) {
             htmx.process(newNavElement);
             console.log("Explicitly processed new #page-navigation element with HTMX.");
         } else {
-            // This case should ideally not happen if the server correctly returns a <nav id="page-navigation">...</nav>
             console.error("#page-navigation element not found after outerHTML swap. This is unexpected.");
         }
     }).catch(error => {
         console.error("Error refreshing navigation panel:", error);
     });
 }
+
+// Re-apply cached live states after page content swap
+document.body.addEventListener('htmx:afterSwap', function(event) {
+    // Check if the swapped content is our main page content area
+    if (event.detail.target.id === 'page-content-area' || event.target.id === 'page-content-area') {
+        const contentArea = event.detail.elt; // The element that was swapped (the new content)
+        
+        console.log("Page content swapped. Re-applying cached live button states.");
+        const buttonsInSwappedContent = contentArea.querySelectorAll('.control-button');
+        
+        buttonsInSwappedContent.forEach(buttonElement => {
+            const buttonIdWithPrefix = buttonElement.id; // e.g., "btn-my_button_1"
+            if (buttonIdWithPrefix && buttonIdWithPrefix.startsWith('btn-')) {
+                const buttonId = buttonIdWithPrefix.substring(4); // Extract "my_button_1"
+                if (liveButtonStates[buttonId]) {
+                    console.log(`Re-applying cached state for button: ${buttonId}`);
+                    updateButtonContent(liveButtonStates[buttonId]);
+                }
+            }
+        });
+    }
+});
+
 
 // Initialize WebSocket connection when the page loads
 document.addEventListener('DOMContentLoaded', connectWebSocket);
