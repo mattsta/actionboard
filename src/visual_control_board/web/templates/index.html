@@ -20,7 +20,7 @@
         {% elif current_page and current_page.buttons %}
             <div 
                 class="button-grid" 
-                {% if current_page.layout == 'grid' and current_page.grid_columns is not none %}
+		{% if current_page.layout == 'grid' and current_page.grid_columns > 0 %}
                     style="grid-template-columns: repeat({{ current_page.grid_columns }}, 1fr);"
                 {% endif %}
             >
