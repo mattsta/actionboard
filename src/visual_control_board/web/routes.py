@@ -285,6 +285,7 @@ async def get_page_content_partial(
             "request": request,
             "all_pages": ui_config.pages,
             "current_page_id": None, # No page is active
+            "is_direct_nav_render": False # This is for OOB swap
         })
         title_html = templates.get_template("partials/title_tag.html").render({"page_title": "Page Not Found"})
         header_title_html = templates.get_template("partials/header_title_tag.html").render({"header_title": "Page Not Found"})
@@ -302,7 +303,8 @@ async def get_page_content_partial(
         "request": request,
         "all_pages": ui_config.pages,
         "current_page_id": selected_page.id,
-        "pending_update_available": pending_update_available # Pass this through
+        "pending_update_available": pending_update_available, # Pass this through
+        "is_direct_nav_render": False # This is for OOB swap
     })
     
     # Render updated page title (for OOB swap)
@@ -328,10 +330,12 @@ async def get_navigation_panel_partial(
     """
     Renders and returns only the navigation panel HTML.
     Used by client-side JS to refresh navigation via WebSocket trigger.
+    The 'is_direct_nav_render' context variable is set to True here.
     """
     if not ui_config or not ui_config.pages:
         # Return an empty nav or a specific message if no pages
-        return HTMLResponse(content='<nav id="page-navigation" class="nav-tabs" hx-swap-oob="true"><ul></ul></nav>')
+        # Ensure it still has the id for replacement target
+        return HTMLResponse(content='<nav id="page-navigation" class="nav-tabs"><ul></ul></nav>')
 
     current_page_id_for_nav = active_page_id
     if active_page_id and not ui_config.find_page(active_page_id):
@@ -345,7 +349,8 @@ async def get_navigation_panel_partial(
         "request": request,
         "all_pages": ui_config.pages,
         "current_page_id": current_page_id_for_nav,
-        "pending_update_available": pending_update_available
+        "pending_update_available": pending_update_available,
+        "is_direct_nav_render": True # Key change: signal direct render
     })
     return HTMLResponse(content=nav_html)
 
@@ -418,13 +423,15 @@ async def handle_button_action(
             "toast_class": toast_class,
         }
     )
+    # Since button hx-swap="none", this button_html part of response is ignored by the button itself.
+    # It's still good practice to have it in case hx-swap behavior changes on button.
     button_html = templates.get_template("partials/button.html").render(
         {
             "request": request,
             "button": button_config, 
         }
     )
-    final_html_content = toast_html + button_html
+    final_html_content = toast_html + button_html 
     return HTMLResponse(content=final_html_content)
 
 

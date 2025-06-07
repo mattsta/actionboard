@@ -1,6 +1,6 @@
 {# Renders navigation tabs. Expects `all_pages` (List[PageConfig]), `current_page_id` (str), and `request` in context. #}
-{# This entire nav block can be swapped Out-Of-Band. #}
-<nav id="page-navigation" class="nav-tabs" hx-swap-oob="true">
+{# `is_direct_nav_render` (boolean, optional): If True, hx-swap-oob is omitted. Defaults to False (OOB behavior). #}
+<nav id="page-navigation" class="nav-tabs"{% if not is_direct_nav_render %} hx-swap-oob="true"{% endif %}>
     <ul>
         {% for page in all_pages %}
         <li>
