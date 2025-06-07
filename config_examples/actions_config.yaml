@@ -1,0 +1,16 @@
+actions:
+  - id: "greet_user_action"
+    module: "visual_control_board.actions.built_in_actions"
+    function: "greet_user_action"
+  
+  - id: "log_current_time_action"
+    module: "visual_control_board.actions.built_in_actions"
+    function: "log_current_time_action"
+
+  - id: "example_async_action"
+    module: "visual_control_board.actions.built_in_actions"
+    function: "example_async_action"
+
+  - id: "another_action"
+    module: "visual_control_board.actions.built_in_actions"
+    function: "another_action"

@@ -1,0 +1,7 @@
+{# Renders a toast message. Expects `message_id`, `message`, `toast_class` in context. #}
+{# This entire div is swapped Out-Of-Band into the #toast-container #}
+<div id="toast-message" hx-swap-oob="true" class="{{ toast_class | default('toast show') }}">
+    <span id="{{ message_id | default('toast-message-content') }}">{{ message }}</span>
+    {# You could add a close button here if desired #}
+    {# <button onclick="this.parentElement.classList.remove('show'); this.parentElement.innerHTML='';">X</button> #}
+</div>

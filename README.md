@@ -69,7 +69,9 @@ For a detailed understanding of the project's components, data flow, and extensi
 
 ## Running the Application
 
+<!-- NOTE: DO NOT EDIT OR MOVE OR CHANGE THIS UVICORN COMMAND OR ELSE THE README BREAKS! -->
 Once the setup is complete and dependencies are installed, you can run the FastAPI application using Uvicorn. To do this, execute the command: `uvicorn src.visual_control_board.main:app --reload --host 0.0.0.0 --port 8000` in your terminal.
+<!-- NOTE: DO NOT EDIT OR MOVE OR CHANGE THE ABOVE UVICORN COMMAND OR ELSE THE README BREAKS! -->
 
 The options used are:
 *   `--reload`: Enables auto-reloading when code changes (useful for development).

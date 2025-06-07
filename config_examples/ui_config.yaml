@@ -1,0 +1,45 @@
+pages:
+  - name: "Main Controls"
+    id: "main_page"
+    layout: "grid"
+    grid_columns: 3
+    buttons:
+      - id: "greet_dev_button"
+        text: "Greet Developer"
+        icon_class: "fas fa-hand-sparkles"
+        action_id: "greet_user_action"
+        action_params:
+          name: "Developer"
+        style_class: "button-primary" # You can define .button-primary in CSS if needed
+      
+      - id: "log_time_button"
+        text: "Log Time"
+        icon_class: "fas fa-clock"
+        action_id: "log_current_time_action"
+        style_class: "button-secondary"
+
+      - id: "async_action_button"
+        text: "Async Task (2s)"
+        icon_class: "fas fa-cogs"
+        action_id: "example_async_action"
+        action_params:
+          duration: 2
+        style_class: "button-success"
+
+      - id: "another_action_button"
+        text: "Generic Action"
+        icon_class: "fas fa-star"
+        action_id: "another_action"
+        style_class: "button-danger" # Just for variety
+
+      - id: "missing_action_button"
+        text: "Test Missing Action"
+        icon_class: "fas fa-question-circle"
+        action_id: "non_existent_action" # This action is not in actions_config.yaml
+
+      - id: "greet_world_button"
+        text: "Greet World"
+        icon_class: "fas fa-globe"
+        action_id: "greet_user_action" # Reusing an action
+        action_params:
+          name: "World"
