@@ -19,72 +19,56 @@ It leverages:
 
 The application is composed of several key components:
 
-1.  **Configuration (`src/visual_control_board/config` and `project_root/user_config`)**
+1.  **Configuration (`src/visual_control_board/config`, `project_root/user_config`, `project_root/config_examples`)**
     *   **Models (`models.py` in `src/visual_control_board/config`):** Defines Pydantic models for structuring configuration data (e.g., `UIConfig`, `PageConfig`, `ButtonConfig`, `ActionsConfig`, `ActionDefinition`). These models ensure that configuration files are correctly formatted and provide type safety.
-    *   **Loader (`loader.py` in `src/visual_control_board/config`):** Responsible for loading and validating `ui_config.yaml` and `actions_config.yaml`. By default, it looks for these files in a `user_config/` directory located at the project root.
-    *   **User Configuration Files (`project_root/user_config/`):** This directory, created and managed by the user at the project root, contains:
-        *   `ui_config.yaml`: Defines the layout of pages, buttons, their appearance (text, icons, styles), and which action they trigger.
-        *   `actions_config.yaml`: Maps action IDs (used in `ui_config.yaml`) to specific Python functions (modules and function names).
-    *   **Example Configuration Files (`config_examples/`):** Provided as templates for users to copy into their `user_config/` directory.
+    *   **Loader (`loader.py` in `src/visual_control_board/config`):** Responsible for loading and validating `ui_config.yaml` and `actions_config.yaml`.
+        *   It first attempts to load configurations from the `user_config/` directory located at the project root (e.g., `project_root/user_config/ui_config.yaml`). This directory is for user-specific overrides.
+        *   If configuration files are not found in `user_config/`, or if the directory doesn't exist, the loader falls back to using the default configurations from the `config_examples/` directory (e.g., `project_root/config_examples/ui_config.yaml`). This ensures the application can run out-of-the-box.
+    *   **User Override Configuration Files (`project_root/user_config/`):** This optional directory, created and managed by the user at the project root, contains:
+        *   `ui_config.yaml`: If present, defines the user's custom layout of pages, buttons, etc.
+        *   `actions_config.yaml`: If present, defines the user's custom action mappings.
+    *   **Default/Example Configuration Files (`project_root/config_examples/`):** Provided as part of the application. These files are used if corresponding files are not found in `user_config/`. They serve as both runnable defaults and templates for user customization.
 
 2.  **Actions (`src/visual_control_board/actions`)**
-    *   **Built-in Actions (`built_in_actions.py`):** A collection of predefined Python functions that can be triggered by buttons (e.g., logging time, greeting a user). Users can add their own action modules here or in separate files.
-    *   **Registry (`registry.py`):** The `ActionRegistry` class is responsible for discovering and loading action functions based on `actions_config.yaml`. It dynamically imports modules and retrieves functions, making them available for execution by their ID. It handles both synchronous and asynchronous action functions.
+    *   **Built-in Actions (`built_in_actions.py`):** A collection of predefined Python functions that can be triggered by buttons.
+    *   **Registry (`registry.py`):** The `ActionRegistry` class discovers and loads action functions based on the loaded `actions_config.yaml`.
 
 3.  **Web Interface (`src/visual_control_board/web`)**
     *   **Main Application (`main.py` at `src/visual_control_board/main.py`):** Initializes the FastAPI application.
-        *   Sets up logging.
-        *   Mounts static file serving.
-        *   Includes API routers.
-        *   Manages application lifecycle events (`startup`, `shutdown`):
-            *   On startup, it initializes `ConfigLoader` to load configurations (from `project_root/user_config/`) and `ActionRegistry` to load actions. These are stored in `app.state` to be accessible via dependency injection.
+        *   On startup, it uses `ConfigLoader` to load configurations (checking `user_config/` then `config_examples/`) and `ActionRegistry` to load actions.
     *   **Routes (`routes.py`):** Defines HTTP endpoints.
-        *   `/`: Serves the main HTML page, rendering buttons based on `ui_config.yaml`.
-        *   `/action/{button_id}` (POST): Handles button clicks triggered by HTMX. It identifies the button, retrieves its associated action and parameters, executes the action via the `ActionRegistry`, and returns an HTML response (typically re-rendering the button and providing a toast notification via HTMX Out-of-Band swaps).
-    *   **Dependencies (`dependencies.py`):** FastAPI dependency functions to provide access to shared application state like `UIConfig`, `ActionsConfig`, and `ActionRegistry` within route handlers. This promotes cleaner code and better testability.
+        *   `/`: Serves the main HTML page.
+        *   `/action/{button_id}` (POST): Handles button clicks.
+    *   **Dependencies (`dependencies.py`):** Provides access to shared application state like configurations and the action registry.
     *   **Templates (`templates/`):** Jinja2 HTML templates.
-        *   `index.html`: The main page layout.
-        *   `partials/button.html`: Template for rendering a single button.
-        *   `partials/toast.html`: Template for rendering toast notifications.
-    *   **Static Files (`static/`):** CSS stylesheets (`style.css`) and potentially JavaScript files.
+    *   **Static Files (`static/`):** CSS stylesheets, etc.
 
 ## Data Flow (Button Click Example)
 
-1.  **User Interaction:** User clicks a button in the web browser.
-2.  **HTMX Request:** HTMX sends a POST request to the `/action/{button_id}` endpoint.
-3.  **FastAPI Routing:** FastAPI routes the request to the `handle_button_action` function in `web/routes.py`.
-4.  **Configuration & Action Retrieval:**
-    *   The route handler uses dependency injection to get the `UIConfig` and `ActionRegistry`.
-    *   It looks up the `ButtonConfig` for the given `button_id` in `UIConfig` to find the `action_id` and any `action_params`.
-5.  **Action Execution:**
-    *   The `ActionRegistry.execute_action(action_id, params)` method is called.
-    *   The registry finds the corresponding Python function and executes it (synchronously or asynchronously).
-6.  **Response Generation:**
-    *   The action function returns a result (e.g., a dictionary with status and message).
-    *   The route handler processes this result to create a user-facing feedback message.
-7.  **HTMX Response:**
-    *   The server renders two HTML partials:
-        *   The updated button state (`partials/button.html`).
-        *   A toast notification (`partials/toast.html`) marked for Out-of-Band (OOB) swapping.
-    *   FastAPI returns this combined HTML to the client.
-8.  **Frontend Update:**
-    *   HTMX receives the response.
-    *   It swaps the original button in the DOM with the new button HTML.
-    *   It swaps the content of the `#toast-container` (or a specific element within it) with the new toast HTML due to the OOB swap directive.
-    *   A small piece of JavaScript handles the display and auto-hiding of the toast.
+(Data flow remains largely the same, with the understanding that configurations are loaded with the new fallback logic.)
+1.  User clicks a button.
+2.  HTMX POST request to `/action/{button_id}`.
+3.  FastAPI routes to `handle_button_action`.
+4.  Dependencies provide `UIConfig` (loaded from `user_config/` or `config_examples/`) and `ActionRegistry`.
+5.  Button details and action ID are retrieved from `UIConfig`.
+6.  `ActionRegistry.execute_action` is called.
+7.  Action function (from `actions_config.yaml`, which was also loaded with fallback) is executed.
+8.  Response is generated.
+9.  HTMX updates the frontend.
 
 ## Extensibility
 
-*   **Adding New Buttons/Pages:** Modify `user_config/ui_config.yaml` in your project root.
+*   **Adding New Buttons/Pages:**
+    *   To customize, copy `config_examples/ui_config.yaml` to `user_config/ui_config.yaml` (at project root) and modify it.
 *   **Adding New Actions:**
-    1.  Write a new Python function (e.g., in `src/visual_control_board/actions/built_in_actions.py` or a new custom module within the `src` directory).
-    2.  Register this function in `user_config/actions_config.yaml` (in your project root) by providing an `id`, `module` path (e.g., `visual_control_board.actions.my_custom_actions`), and `function` name.
-*   **Custom Styling:** Modify `src/visual_control_board/static/css/style.css` or add new CSS classes referenced in `ui_config.yaml`.
+    1.  Write a new Python function.
+    2.  To customize, copy `config_examples/actions_config.yaml` to `user_config/actions_config.yaml` (at project root). Register your function in `user_config/actions_config.yaml`.
+*   **Custom Styling:** Modify `src/visual_control_board/static/css/style.css`.
 
 ## Future Considerations (Potential Features)
 
-*   **Configurable Config Paths:** Allow overriding default configuration paths via environment variables or command-line arguments.
-*   **Multi-Page Navigation:** The current setup serves the first page. A navigation system could be added.
-*   **Dynamic Button Content:** The `dynamic_content_url` in `ButtonConfig` could be implemented to allow buttons to periodically fetch and update their text/icon from a URL.
-*   **User Authentication & Authorization:** For sensitive actions, an authentication layer would be necessary.
-*   **WebSockets for Real-time Updates:** For more immediate feedback or server-pushed updates to buttons, WebSockets could be integrated.
+*   **Configurable Config Paths (Advanced):** Allow overriding all config paths (user override, default examples) via environment variables for deployment scenarios.
+*   **Multi-Page Navigation.**
+*   **Dynamic Button Content.**
+*   **User Authentication & Authorization.**
+*   **WebSockets for Real-time Updates.**

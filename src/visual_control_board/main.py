@@ -38,14 +38,16 @@ async def startup_event():
     """
     Application startup event.
     Load configurations and initialize action registry.
+    Configurations are loaded first from 'user_config/' at the project root (if present),
+    falling back to 'config_examples/' if user-specific files are not found.
     These are stored in app.state for access via dependency injection.
-    If critical configurations (UI or Actions) fail to load, the application
-    will raise a RuntimeError to prevent starting in a broken state.
+    If critical configurations (UI or Actions) fail to load even from fallbacks,
+    the application will raise a RuntimeError.
     """
     logger.info("Application starting up...")
 
-    # Initialize and load configurations
-    # ConfigLoader now defaults to 'user_config/' at the project root.
+    # Initialize and load configurations.
+    # ConfigLoader will try user_config/ first, then config_examples/.
     config_loader_instance = ConfigLoader() 
     config_loader_instance.load_configs()
 
@@ -53,26 +55,24 @@ async def startup_event():
     app.state.actions_config = config_loader_instance.actions_config
 
     if app.state.ui_config is None:
-        logger.critical("CRITICAL: Failed to load UI configuration. Check paths and file content in project_root/user_config/.")
+        logger.critical("CRITICAL: Failed to load UI configuration. No UI config found in 'user_config/' or 'config_examples/'. Application cannot start.")
         raise RuntimeError("Failed to load UI configuration. Application cannot start.")
     else:
         logger.info("UI configuration loaded successfully.")
 
     if app.state.actions_config is None:
-        logger.critical("CRITICAL: Failed to load Actions configuration. Check paths and file content in project_root/user_config/.")
+        logger.critical("CRITICAL: Failed to load Actions configuration. No Actions config found in 'user_config/' or 'config_examples/'. Application cannot start.")
         raise RuntimeError("Failed to load Actions configuration. Application cannot start.")
     else:
         logger.info("Actions configuration loaded successfully.")
     
     # Initialize Action Registry
     action_registry_instance = ActionRegistry()
-    # Actions config is guaranteed to be non-None here due to the check above,
-    # but we check again for logical completeness or if the above logic changes.
-    if app.state.actions_config:
+    if app.state.actions_config: # Should always be true if startup checks passed
         action_registry_instance.load_actions(actions_config=app.state.actions_config)
     else:
         # This case should ideally not be reached if the RuntimeError above is active.
-        logger.warning("Actions configuration is missing; no actions were loaded into the registry. This is unexpected if startup checks passed.")
+        logger.warning("Actions configuration is missing post-startup checks; no actions were loaded. This is unexpected.")
     app.state.action_registry = action_registry_instance
     logger.info("Action registry initialized.")
     
@@ -87,9 +87,9 @@ async def shutdown_event():
 # To run this app (from the project root directory):
 # 1. Ensure you have `uv` installed and a virtual environment set up and activated.
 # 2. Install dependencies: `uv pip install -e .[dev]`
-# 3. Create a 'user_config' directory at the project root if it doesn't exist:
+# 3. (Optional) To customize, create 'user_config/' at the project root and copy examples:
 #    mkdir -p user_config
-# 4. Copy example configs to 'user_config/' at the project root:
 #    cp config_examples/ui_config.yaml user_config/
 #    cp config_examples/actions_config.yaml user_config/
-# 5. Run: uvicorn src.visual_control_board.main:app --reload --host 0.0.0.0 --port 8000
+# 4. Run: uvicorn src.visual_control_board.main:app --reload --host 0.0.0.0 --port 8000
+#    The app will run with example configs if 'user_config/' is not set up.

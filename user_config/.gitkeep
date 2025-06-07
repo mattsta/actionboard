@@ -1,0 +1,15 @@
+# This 'user_config' directory, located at the project root, is for your personal configurations.
+# Files placed here (e.g., ui_config.yaml, actions_config.yaml) will override the
+# default configurations found in the 'config_examples/' directory.
+
+# To get started with customization:
+# 1. Copy 'config_examples/ui_config.yaml' to this directory.
+# 2. Copy 'config_examples/actions_config.yaml' to this directory.
+# 3. Modify the copied files as needed.
+
+# This directory is typically added to .gitignore if your configurations are
+# machine-specific or contain sensitive information.
+# If your configurations are generic and meant to be shared with the project,
+# you might choose to commit them (though 'config_examples' serves as the base).
+
+# This .gitkeep file helps in versioning this directory if it's initially empty.

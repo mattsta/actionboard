@@ -4,15 +4,16 @@ A web-based visual control board, inspired by devices like Elgato Stream Deck, b
 
 ## Features
 
-*   **Dynamic UI:** Button layouts, appearances, and actions are defined in YAML configuration files (`ui_config.yaml`, `actions_config.yaml`).
-*   **Pluggable Actions:** Button actions are mapped to Python functions, allowing for easy extension by adding new Python modules and functions.
+*   **Dynamic UI:** Button layouts, appearances, and actions are defined in YAML configuration files.
+*   **Runs Out-of-the-Box:** Comes with default example configurations, so it's runnable immediately after setup.
+*   **User-Managed Overrides:** Customize by placing your `ui_config.yaml` and `actions_config.yaml` in a `user_config/` directory at the project root. These will override the defaults.
+*   **Pluggable Actions:** Button actions are mapped to Python functions, allowing for easy extension.
 *   **Web Interface:** Accessible from any web browser on the local network.
 *   **HTMX Powered:** Rich user interactions with minimal JavaScript.
 *   **FastAPI Backend:** Modern, fast Python web framework.
-*   **Dependency Injection:** Core components like configuration and action registry are managed via FastAPI's dependency injection for better testability and maintainability.
+*   **Dependency Injection:** Core components are managed via FastAPI's dependency injection.
 *   **Centralized Logging:** Standardized logging for application events.
 *   **`uv` Managed:** Uses `uv` for package management and virtual environments.
-*   **User-Managed Configurations:** Configuration files are stored in a `user_config/` directory at the project root, outside the main application package.
 
 ## Architecture
 
@@ -44,18 +45,19 @@ For a detailed understanding of the project's components and data flow, please r
     ```
     This installs the package in editable mode (`-e`) along with development dependencies.
 
-4.  **Set up User Configurations:**
-    *   The application expects configuration files in a `user_config/` directory at the root of the project.
-    *   Create this directory if it doesn't exist:
-        ```bash
-        mkdir -p user_config
-        ```
-    *   Copy the example configurations from `config_examples/` to your new `user_config/` directory:
-        ```bash
-        cp config_examples/ui_config.yaml user_config/
-        cp config_examples/actions_config.yaml user_config/
-        ```
-    *   Modify these copied files in `user_config/` to customize your board. **Do not edit the files in `config_examples/` directly for your setup.**
+4.  **Configuration:**
+    *   The application runs by default using the example configurations found in the `config_examples/` directory.
+    *   **To customize:**
+        1.  Create a `user_config/` directory at the root of the project (i.e., at the same level as `src/` and `README.md`):
+            ```bash
+            mkdir -p user_config
+            ```
+        2.  Copy the example configurations from `config_examples/` to your new `user_config/` directory:
+            ```bash
+            cp config_examples/ui_config.yaml user_config/
+            cp config_examples/actions_config.yaml user_config/
+            ```
+        3.  Modify the files within `user_config/` to customize your board. These files will take precedence over the defaults in `config_examples/`.
 
 ## Running the Application
 

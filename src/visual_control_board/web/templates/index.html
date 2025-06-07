@@ -32,7 +32,10 @@
              <p>No buttons configured for page: {{ current_page.name }}.</p>
         {% else %}
             <p>No page or buttons configured to display.</p>
-            <p>Please ensure <code>ui_config.yaml</code> is correctly placed in <code>src/visual_control_board/user_config/</code> and is properly formatted.</p>
+            <p>Please ensure <code>ui_config.yaml</code> is correctly formatted.
+            The application looks for configurations in <code>user_config/</code> at the project root first,
+            then falls back to <code>config_examples/</code>. Check server logs for more details if issues persist.
+            </p>
         {% endif %}
     </main>
 
