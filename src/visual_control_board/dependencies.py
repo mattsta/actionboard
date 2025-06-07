@@ -4,7 +4,7 @@ import logging
 
 from .config.models import UIConfig, ActionsConfig
 from .actions.registry import ActionRegistry
-from .live_updates import LiveUpdateManager # Added import
+from .live_updates import LiveUpdateManager
 
 logger = logging.getLogger(__name__)
 
@@ -49,13 +49,32 @@ def get_pending_update_flag(request: Request) -> bool:
 
 def get_live_update_manager(request: Request) -> LiveUpdateManager:
     """
-    FastAPI dependency to retrieve the LiveUpdateManager instance from application state.
+    FastAPI dependency to retrieve the LiveUpdateManager instance from application state
+    for HTTP routes.
     """
     manager: Optional[LiveUpdateManager] = getattr(request.app.state, "live_update_manager", None)
     if manager is None:
-        logger.critical("LiveUpdateManager not found in application state. This indicates a severe startup issue.")
+        logger.critical("LiveUpdateManager not found in application state (HTTP context). This indicates a severe startup issue.")
         raise HTTPException(
             status_code=500,
+            detail="LiveUpdateManager is not available due to an internal server error."
+        )
+    return manager
+
+def get_live_update_manager_ws(websocket: WebSocket) -> LiveUpdateManager:
+    """
+    FastAPI dependency to retrieve the LiveUpdateManager instance from application state
+    for WebSocket routes.
+    """
+    manager: Optional[LiveUpdateManager] = getattr(websocket.app.state, "live_update_manager", None)
+    if manager is None:
+        # If this dependency fails, FastAPI will typically close the WebSocket connection
+        # with an error code (e.g., 1011 for server error, or 403 if HTTPException is raised before accept).
+        logger.critical("LiveUpdateManager not found in application state (WebSocket context). This indicates a severe startup issue.")
+        # Raising HTTPException here might result in a 403 response before handshake completes,
+        # which client interprets as "bad response". This is acceptable for a critical setup error.
+        raise HTTPException(
+            status_code=500, # Internal Server Error
             detail="LiveUpdateManager is not available due to an internal server error."
         )
     return manager

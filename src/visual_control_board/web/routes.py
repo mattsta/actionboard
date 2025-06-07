@@ -11,7 +11,8 @@ from visual_control_board.config.models import (
 )
 from visual_control_board.actions.registry import ActionRegistry
 from visual_control_board.dependencies import (
-    get_ui_config, get_action_registry, get_pending_update_flag, get_live_update_manager
+    get_ui_config, get_action_registry, get_pending_update_flag, get_live_update_manager,
+    get_live_update_manager_ws # Import the new WebSocket-specific dependency
 )
 from visual_control_board.live_updates import LiveUpdateManager
 
@@ -104,20 +105,13 @@ live_updates_router = APIRouter(prefix="/api/v1/buttons", tags=["Live Button Upd
 @live_updates_router.post("/update_content", status_code=200)
 async def push_button_content_update(
     update_data: ButtonContentUpdate,
-    live_update_mgr: LiveUpdateManager = Depends(get_live_update_manager)
+    live_update_mgr: LiveUpdateManager = Depends(get_live_update_manager) # Uses the HTTP-compatible dependency
 ):
     """
     Receives a request to update a button's content and broadcasts it via WebSocket.
     """
     logger.info(f"Received request to update content for button_id: {update_data.button_id}")
     
-    # Here, you might want to validate if the button_id exists in the current_ui_config.
-    # For simplicity, we'll skip that for now and assume valid button_ids are sent.
-    # ui_config: Optional[UIConfig] = request.app.state.current_ui_config
-    # if ui_config and not ui_config.find_button_and_page(update_data.button_id):
-    #     logger.warning(f"Attempted to update content for non-existent button_id: {update_data.button_id}")
-    #     raise HTTPException(status_code=404, detail=f"Button with id '{update_data.button_id}' not found in current UI configuration.")
-
     await live_update_mgr.broadcast_button_update(update_data.model_dump(exclude_none=True))
     return {"message": "Button content update broadcasted.", "button_id": update_data.button_id}
 
@@ -126,23 +120,20 @@ async def push_button_content_update(
 @router.websocket("/ws/button_updates")
 async def websocket_button_updates_endpoint(
     websocket: WebSocket, 
-    live_update_mgr: LiveUpdateManager = Depends(get_live_update_manager)
+    live_update_mgr: LiveUpdateManager = Depends(get_live_update_manager_ws) # Use the WebSocket-compatible dependency
 ):
     """
     WebSocket endpoint for clients to receive live button content updates.
     """
-    await live_update_mgr.connect(websocket)
+    await live_update_mgr.connect(websocket) # This internally calls await websocket.accept()
     try:
         while True:
             # Keep the connection alive. Clients primarily receive data.
-            # You could implement a ping/pong or receive messages from client if needed.
-            # For now, we just wait for disconnect.
-            # If client sends data, it would be `data = await websocket.receive_text()` or `receive_json()`
-            # This example doesn't expect client-to-server messages on this WS after connection.
-            await websocket.receive_text() # This will block until a message or disconnect
-            # If you expect messages, process them here. Otherwise, this is just to keep alive / detect close.
+            # This will block until a message is received or the connection is closed by the client.
+            await websocket.receive_text() 
+            # If you expect messages from the client, process them here.
+            # For now, any text received is just logged as a keep-alive or unexpected message.
             logger.debug(f"Received keep-alive or unexpected message from {websocket.client}")
-
 
     except WebSocketDisconnect:
         logger.info(f"WebSocket {websocket.client} disconnected.")
