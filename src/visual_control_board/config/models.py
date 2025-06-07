@@ -161,9 +161,9 @@ class ButtonContentUpdate(BaseModel):
     text: Optional[str] = Field(default=None, description="New text for the button.")
     icon_class: Optional[str] = Field(
         default=None,
-        description="New FontAwesome icon class. Empty string or null to remove icon.",
+        description="New FontAwesome icon class. Send an empty string ('') to remove/hide the current icon.",
     )
     style_class: Optional[str] = Field(
         default=None,
-        description="New custom CSS class for styling. Empty string or null to remove custom style.",
+        description="New custom CSS class for styling. Send an empty string ('') to remove the current custom style and revert to default button styling.",
     )

@@ -80,6 +80,89 @@ The options used are:
 
 Open your web browser and navigate to `http://localhost:8000` (or `http://<your-server-ip>:8000` if accessing from another device).
 
+## Creating Custom Actions
+
+You can extend the functionality of the Visual Control Board by adding your own custom actions. Here's how:
+
+1.  **Write your Action Function in Python:**
+    *   Create a new Python file (e.g., `my_custom_actions.py`) or add to an existing one (like `src/visual_control_board/actions/built_in_actions.py`).
+    *   Your function can be synchronous (`def`) or asynchronous (`async def`).
+    *   It can accept parameters, which will be supplied from `action_params` in your `ui_config.yaml`.
+    *   It's recommended to return a dictionary, often with `"status"` and `"message"` keys, for UI feedback (e.g., toast notifications).
+
+    Example (`my_custom_actions.py` placed in `src/visual_control_board/actions/`):
+    ```python
+    # src/visual_control_board/actions/my_custom_actions.py
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    def my_new_action(target_url: str, attempts: int = 1):
+        logger.info(f"My new action called with URL: {target_url} and {attempts} attempts.")
+        # ... your custom logic here ...
+        return {
+            "status": "success",
+            "message": f"Successfully pinged {target_url} {attempts} times."
+        }
+
+    async def my_async_custom_action(user_id: str):
+        logger.info(f"Async custom action for user: {user_id}")
+        # ... your async logic here ...
+        await asyncio.sleep(1) # Example async operation
+        return {
+            "status": "success",
+            "message": f"Async task for {user_id} completed."
+        }
+    ```
+
+2.  **Register your Action in `actions_config.yaml`:**
+    *   Open your `user_config/actions_config.yaml` (or `config_examples/actions_config.yaml` if you're providing defaults).
+    *   Add a new entry under the `actions` list:
+        *   `id`: A unique identifier for your action.
+        *   `module`: The Python module path to your function (e.g., `visual_control_board.actions.my_custom_actions`).
+        *   `function`: The name of your Python function.
+
+    Example `actions_config.yaml` entry:
+    ```yaml
+    actions:
+      # ... other actions ...
+      - id: "custom_ping_action"
+        module: "visual_control_board.actions.my_custom_actions"
+        function: "my_new_action"
+      
+      - id: "custom_async_user_task"
+        module: "visual_control_board.actions.my_custom_actions"
+        function: "my_async_custom_action"
+    ```
+    *Ensure your Python module (`my_custom_actions.py` in this example) is discoverable in Python's path. Placing it within the `src/visual_control_board/actions/` directory and making sure `src/visual_control_board/actions/__init__.py` exists usually suffices.*
+
+3.  **Use your Action in `ui_config.yaml`:**
+    *   In your `user_config/ui_config.yaml`, define a button and set its `action_id` to the ID you registered.
+    *   You can pass parameters using `action_params`.
+
+    Example `ui_config.yaml` button:
+    ```yaml
+    pages:
+      - name: "Custom Page"
+        id: "custom_page"
+        buttons:
+          - id: "trigger_my_action"
+            text: "Ping Example.com"
+            icon_class: "fas fa-network-wired"
+            action_id: "custom_ping_action"
+            action_params:
+              target_url: "http://example.com"
+              attempts: 3
+          - id: "trigger_my_async_action"
+            text: "User Task"
+            icon_class: "fas fa-user-cog"
+            action_id: "custom_async_user_task"
+            action_params:
+              user_id: "user123"
+    ```
+
+4.  **Restart the Application:** If the application is already running, you'll need to restart it for the new Python modules and action configurations to be loaded. If you're using `--reload`, changes to Python files might trigger a reload, but new action configurations in YAML typically require a restart or a dynamic configuration update via the API.
+
 ## Dynamic Configuration API
 
 (See ARCHITECTURE.md for details on `/api/v1/config/*` endpoints)
