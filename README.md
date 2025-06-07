@@ -21,52 +21,40 @@ A web-based visual control board, inspired by devices like Elgato Stream Deck, b
 *   **`uv` Managed Project.**
 *   **Multi-Page Navigation:** Define multiple pages (tabs) in `ui_config.yaml` and navigate between them.
 
+## Quickstart
+
+```bash
+pip install -U uv
+uv sync
+uv run uvicorn src.visual_control_board.main:app --reload --host 0.0.0.0 --port 8000
+# open http://127.0.0.1:8000
+# Configuration files for actions are in config_examples/actions_config.yaml
+# Configuration files for tab and button layout binding to actions are in config_examples/ui_config.yaml
+
+# You can also run a demo of replacing/updating the entire buttons UI live
+# (along with having buttons refresh their display content from API updates)
+# with the example script at:
+uv run python -m examples.dynamic_board_controller
+```
+
 ## Architecture
 
 For a detailed understanding of the project's components, data flow, and extensibility, including the dynamic configuration and live update mechanisms, please refer to the [ARCHITECTURE.md](ARCHITECTURE.md) document.
 
-## Prerequisites
+### **Initial Configuration (Optional but Recommended for Customization)**
 
-*   Python 3.8+
-*   `uv` (Python package installer and virtual environment manager).
-    *   If you don't have `uv`, you can install it: `pip install uv` (or `pipx install uv`).
-
-## Setup and Installation
-
-1.  **Clone the repository (if you haven't already):**
-    ```bash
-    git clone <repository-url>
-    cd visual-control-board 
-    ```
-    (Replace `<repository-url>` with the actual URL of your repository).
-
-2.  **Create and activate a virtual environment using `uv`:**
-    ```bash
-    uv venv
-    source .venv/bin/activate  # On Linux/macOS
-    # .venv\Scripts\activate    # On Windows (Command Prompt)
-    # .\.venv\Scripts\Activate.ps1 # On Windows (PowerShell)
-    ```
-
-3.  **Install dependencies using `uv`:**
-    ```bash
-    uv pip install -e .[dev]
-    ```
-    This installs the package in editable mode (`-e .`) along with development dependencies specified in `pyproject.toml` (`[dev]`).
-
-4.  **Initial Configuration (Optional but Recommended for Customization):**
-    *   The application runs by default using the example configurations found in the `config_examples/` directory.
-    *   To customize:
-        1.  Ensure a `user_config/` directory exists at the root of the project. If not, create it:
-            ```bash
-            mkdir -p user_config
-            ```
-        2.  Copy the example configurations from `config_examples/` to your `user_config/` directory:
-            ```bash
-            cp config_examples/ui_config.yaml user_config/
-            cp config_examples/actions_config.yaml user_config/
-            ```
-        3.  Modify the YAML files within `user_config/` to define your custom pages, buttons, and actions. These files will take precedence over the defaults in `config_examples/` when the application starts.
+*   The application runs by default using the example configurations found in the `config_examples/` directory.
+*   To customize:
+    1.  Ensure a `user_config/` directory exists at the root of the project. If not, create it:
+        ```bash
+        mkdir -p user_config
+        ```
+    2.  Copy the example configurations from `config_examples/` to your `user_config/` directory:
+        ```bash
+        cp config_examples/ui_config.yaml user_config/
+        cp config_examples/actions_config.yaml user_config/
+        ```
+    3.  Modify the YAML files within `user_config/` to define your custom pages, buttons, and actions. These files will take precedence over the defaults in `config_examples/` when the application starts.
 
 ## Running the Application
 
