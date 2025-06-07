@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ page_title | default("Visual Control Board") }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/style.css') }}">
+    <!-- FontAwesome for icons (optional, if you use icon_class) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://unpkg.com/htmx.org@1.9.10" integrity="sha384-D1Kt99CQMDuVetoL1lrYwg5t+9QdHe7NLX/SoJYkXDFfX37iInKRy5xLSi8nO7UC" crossorigin="anonymous"></script>
+</head>
+<body>
+    <header>
+        <h1>{{ current_page.name if current_page else page_title | default("Control Board") }}</h1>
+    </header>
+
+    <main class="container">
+        {% if error %}
+            <div class="error-message">{{ error }}</div>
+        {% elif current_page and current_page.buttons %}
+            <div 
+                class="button-grid" 
+                {% if current_page.layout == 'grid' and current_page.grid_columns and current_page.grid_columns > 0 %}
+                    style="grid-template-columns: repeat({{ current_page.grid_columns }}, 1fr);"
+                {% endif %}
+            >
+                {% for button in current_page.buttons %}
+                    {% include "partials/button.html" with button=button, request=request %}
+                {% endfor %}
+            </div>
+        {% elif current_page %}
+             <p>No buttons configured for page: {{ current_page.name }}.</p>
+        {% else %}
+            <p>No page or buttons configured to display.</p>
+        {% endif %}
+    </main>
+
+    <footer>
+        <p>Visual Control Board</p>
+        <!-- Area for toast messages / feedback -->
+        <div id="toast-container">
+            {# Initial placeholder for OOB swaps. The actual toast content comes from toast.html partial #}
+            {# Example: <div id="toast-message" class="toast">Initial Toast Content (will be replaced)</div> #}
+        </div>
+    </footer>
+
+    <script>
+        document.body.addEventListener('htmx:afterSwap', function(event) {
+            // Check if the swapped content includes our toast structure
+            // The OOB swap targets #toast-container by placing a div with id="toast-message" inside it.
+            const toastElement = document.getElementById('toast-message'); 
+            
+            if (toastElement && toastElement.classList.contains('show')) {
+                setTimeout(() => {
+                    toastElement.classList.remove('show');
+                    // Optional: remove the element after fade out to keep DOM clean if many toasts appear
+                    // setTimeout(() => {
+                    //     if (toastElement.parentElement) {
+                    //         toastElement.parentElement.removeChild(toastElement);
+                    //     }
+                    // }, 500); // Match CSS transition duration
+                }, 3000); // Hide after 3 seconds
+            }
+        });
+    </script>
+</body>
+</html>
