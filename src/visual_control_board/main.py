@@ -3,6 +3,7 @@ from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 import logging
 import sys
+from typing import Optional # Added import
 
 from .config.loader import ConfigLoader
 from .config.models import UIConfig, ActionsConfig # For type checking app.state
