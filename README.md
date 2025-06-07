@@ -69,6 +69,42 @@ For a detailed understanding of the project's components, data flow, and extensi
 
 ## Running the Application
 
-Once the setup is complete and dependencies are installed, you can run the FastAPI application using Uvicorn.
-Execute the following command in your terminal:
+Once the setup is complete and dependencies are installed, you can run the FastAPI application using Uvicorn. To do this, execute the command: `uvicorn src.visual_control_board.main:app --reload --host 0.0.0.0 --port 8000` in your terminal.
 
+The options used are:
+*   `--reload`: Enables auto-reloading when code changes (useful for development).
+*   `--host 0.0.0.0`: Makes the application accessible from other devices on your network.
+*   `--port 8000`: Specifies the port to run on.
+
+Open your web browser and navigate to `http://localhost:8000` (or `http://<your-server-ip>:8000` if accessing from another device).
+
+## Dynamic Configuration API
+
+(See ARCHITECTURE.md for details on `/api/v1/config/*` endpoints)
+
+## Live Button Content Update API
+
+*   **WebSocket Endpoint: `GET /ws/button_updates`**
+    *   Clients connect to this endpoint to receive live updates.
+    *   Messages are JSON, typically: `{"type": "button_content_update", "payload": {"button_id": "...", "text": "...", ...}}`
+
+*   **HTTP Endpoint: `POST /api/v1/buttons/update_content`**
+    *   **Purpose**: Allows external services or internal logic to push a content update for a specific button.
+    *   **Request Body**: A JSON object matching the `ButtonContentUpdate` model:
+        ```json
+        {
+          "button_id": "my_button_1",
+          "text": "New Live Text!",
+          "icon_class": "fas fa-sync fa-spin",
+          "style_class": "button-live-updated"
+        }
+        ```
+        (All fields in the payload except `button_id` are optional).
+    *   **Behavior**: The server broadcasts this update payload to all connected WebSocket clients.
+    *   **Response**: `200 OK` with a confirmation message.
+
+## Future Enhancements (Potential)
+
+*   **More Granular API Updates:** APIs to update specific pages or buttons instead of the entire configuration for full updates.
+*   **Authentication/Authorization:** Secure API endpoints and WebSocket connections.
+*   **Multi-Page Navigation.**
