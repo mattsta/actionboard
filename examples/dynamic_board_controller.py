@@ -105,7 +105,10 @@ def add_new_page(page_id: str, page_name: str, columns: int = 2):
     }
     ui_conf["pages"].append(new_page)
     print(f"Page '{page_name}' added to local configuration.")
-    return stage_and_apply_current_config()
+    # This function now only modifies the local config.
+    # stage_and_apply_current_config() should be called after all modifications are done.
+    return True
+
 
 def add_button_to_page(page_id: str, button_id: str, button_text: str, 
                        action_id: str = "log_current_time_action", icon: str = "fas fa-cube",
@@ -188,7 +191,7 @@ def send_button_content_update(button_id: str, text: str = None, icon_class: str
 sparkline_data_points = []
 MAX_SPARKLINE_POINTS = 30 
 ICONS_TO_CYCLE = ["fas fa-hourglass-start", "fas fa-hourglass-half", "fas fa-hourglass-end", "fas fa-sync fa-spin", "fas fa-bolt", "fas fa-star"]
-SPARKLINE_BASE_COLOR = "#17A2B8" # A nice teal color
+SPARKLINE_BASE_COLOR = "#FFC107" # Amber/Yellow - good contrast on green "button-success"
 
 def generate_next_sparkline_value():
     """Generates a new value for the sparkline, simulating a time series."""
@@ -275,8 +278,11 @@ if __name__ == "__main__":
     # 1. Add a new page
     demo_page_id = "dynamic_demo_page"
     if not add_new_page(page_id=demo_page_id, page_name="Live Demos", columns=2):
-        print(f"Failed to add page '{demo_page_id}'. Exiting.")
-        sys.exit(1)
+        # If add_new_page now returns True even if page exists, this check is fine.
+        # If it returns False on existing page, then stage_and_apply_current_config() might not be called.
+        # The current add_new_page returns True if page exists, but doesn't call apply.
+        # We need to call apply after all modifications.
+        pass # Page will be added or already exists.
     
     # 2. Add buttons to this new page
     # Button for Icon/Text Demo
