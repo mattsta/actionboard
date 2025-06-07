@@ -69,4 +69,6 @@ For a detailed understanding of the project's components, data flow, and extensi
 
 ## Running the Application
 
-Once the setup is complete and dependencies are installed, you can run the FastAPI application using Uvicorn:
+Once the setup is complete and dependencies are installed, you can run the FastAPI application using Uvicorn.
+Execute the following command in your terminal:
+
