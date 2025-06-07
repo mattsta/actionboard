@@ -1,0 +1,44 @@
+[project]
+name = "visual_control_board"
+version = "0.1.0"
+description = "A web-based visual control board using FastAPI and HTMX."
+authors = [
+    { name = "Your Name", email = "your.email@example.com" },
+]
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+
+dependencies = [
+    "fastapi>=0.100.0",
+    "uvicorn[standard]>=0.23.0",
+    "pydantic>=2.0.0",
+    "PyYAML>=6.0",
+    "jinja2>=3.0",
+    "python-dotenv>=1.0.0", # For managing environment variables if needed later
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "ruff>=0.1.0",
+]
+
+[project.scripts]
+# If you want to define a command-line entry point later
+# visual-control-board = "visual_control_board.main:cli"
+
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 88
+select = ["E", "W", "F", "I", "UP", "C4", "B", "A", "RUF"]
+ignore = []
+
+[tool.ruff.format]
+quote-style = "double"
