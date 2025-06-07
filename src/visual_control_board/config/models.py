@@ -4,45 +4,56 @@ from pydantic import BaseModel, Field
 class ButtonActionParams(BaseModel):
     """
     Flexible model for action parameters.
-    Allows any key-value pairs. For more specific validation,
-    consider creating distinct models per action type in the future.
+    This model uses Pydantic's capability to allow arbitrary key-value pairs
+    (extra='allow' is the default behavior when no specific fields are defined,
+    or when inheriting from BaseModel directly).
+    This provides flexibility for actions to define their own expected parameters
+    without needing a new Pydantic model for each action's parameter set.
+
+    For actions requiring specific, validated parameters, you could in the future:
+    1. Define specific Pydantic models for those parameters.
+    2. Implement a discriminated union or a more complex validation scheme within
+       the action execution logic if type-safe parameter parsing per action is desired.
+    
+    Currently, parameters are passed as a dictionary to the action function,
+    and it's up to the action function to handle them.
     """
-    # Allows any key-value pairs by Pydantic's default extra='allow' if no fields defined,
-    # or use RootModel for direct dict if preferred.
-    # For now, this empty model with default_factory=dict in ButtonConfig works.
-    pass
+    # Pydantic's default behavior for extra fields is 'allow',
+    # so any key-value pairs provided in `action_params` will be captured.
+    # No specific fields are defined here to maintain maximum flexibility.
+    # Example: {"url": "http://example.com", "retries": 3}
+    class Config:
+        extra = "allow"
+
 
 class ButtonConfig(BaseModel):
-    id: str
-    text: str
-    icon_class: Optional[str] = None  # e.g., FontAwesome class like "fas fa-rocket"
-    style_class: Optional[str] = None # Custom CSS class for additional styling
+    id: str = Field(..., description="Unique identifier for the button.")
+    text: str = Field(..., description="Text displayed on the button.")
+    icon_class: Optional[str] = Field(default=None, description="CSS class for an icon (e.g., FontAwesome 'fas fa-rocket').")
+    style_class: Optional[str] = Field(default=None, description="Custom CSS class for additional button styling.")
     
-    # action_id links to a single action defined in actions_config.yaml.
-    # For future "tree of actions" or sequences, this model would need to evolve
-    # e.g., action_id: Union[str, List[str], ActionSequenceConfig]
-    action_id: str 
-    action_params: Optional[Dict[str, Any]] = Field(default_factory=dict)
+    action_id: str = Field(..., description="Identifier of the action to be executed, defined in actions_config.yaml.")
+    action_params: ButtonActionParams = Field(default_factory=ButtonActionParams, description="Parameters to pass to the action function.")
     
     # For future dynamic content updates (e.g., button text/icon changes based on external state).
     # Implementation of polling/push updates for this URL is future work.
-    dynamic_content_url: Optional[str] = None 
+    dynamic_content_url: Optional[str] = Field(default=None, description="URL for dynamically fetching button content (future feature).")
 
 class PageConfig(BaseModel):
-    name: str
-    id: str
-    layout: str = "grid" # "grid", "flex", etc.
-    grid_columns: Optional[int] = Field(default=3, gt=0) # Relevant if layout is "grid"
-    buttons: List[ButtonConfig]
+    name: str = Field(..., description="Display name of the page.")
+    id: str = Field(..., description="Unique identifier for the page.")
+    layout: str = Field(default="grid", description="Layout type for the page (e.g., 'grid', 'flex').")
+    grid_columns: Optional[int] = Field(default=3, gt=0, description="Number of columns if layout is 'grid'.")
+    buttons: List[ButtonConfig] = Field(..., description="List of buttons on this page.")
 
 class UIConfig(BaseModel):
-    pages: List[PageConfig]
+    pages: List[PageConfig] = Field(..., description="List of pages in the UI.")
 
 class ActionDefinition(BaseModel):
-    id: str
-    module: str
-    function: str
+    id: str = Field(..., description="Unique identifier for the action.")
+    module: str = Field(..., description="Python module path where the action function is defined.")
+    function: str = Field(..., description="Name of the action function within the module.")
 
 class ActionsConfig(BaseModel):
-    actions: List[ActionDefinition]
+    actions: List[ActionDefinition] = Field(..., description="List of action definitions.")
 

@@ -25,13 +25,14 @@
                 {% endif %}
             >
                 {% for button in current_page.buttons %}
-                    {% include "partials/button.html" with button=button, request=request %}
+                    {% include "partials/button.html" with button=button, request=request, current_page=current_page %}
                 {% endfor %}
             </div>
         {% elif current_page %}
              <p>No buttons configured for page: {{ current_page.name }}.</p>
         {% else %}
             <p>No page or buttons configured to display.</p>
+            <p>Please ensure <code>ui_config.yaml</code> is correctly placed in <code>src/visual_control_board/user_config/</code> and is properly formatted.</p>
         {% endif %}
     </main>
 
@@ -45,8 +46,10 @@
     </footer>
 
     <script>
+        // This script handles the auto-hiding of toast messages.
+        // For more complex JavaScript, consider moving this to a separate file in static/js/.
         document.body.addEventListener('htmx:afterSwap', function(event) {
-            // Check if the swapped content includes our toast structure
+            // Check if the swapped content includes our toast structure.
             // The OOB swap targets #toast-container by placing a div with id="toast-message" inside it.
             const toastElement = document.getElementById('toast-message'); 
             
@@ -54,11 +57,17 @@
                 setTimeout(() => {
                     toastElement.classList.remove('show');
                     // Optional: remove the element after fade out to keep DOM clean if many toasts appear
-                    // setTimeout(() => {
-                    //     if (toastElement.parentElement) {
-                    //         toastElement.parentElement.removeChild(toastElement);
-                    //     }
-                    // }, 500); // Match CSS transition duration
+                    // and to ensure subsequent toasts with the same ID are correctly handled.
+                    setTimeout(() => {
+                        if (toastElement.parentElement) {
+                            // Check if it's still the same element before removing,
+                            // in case a new toast replaced it quickly.
+                            const currentToast = document.getElementById('toast-message');
+                            if (currentToast === toastElement) {
+                                currentToast.remove();
+                            }
+                        }
+                    }, 500); // Match CSS transition duration for fade-out
                 }, 3000); // Hide after 3 seconds
             }
         });

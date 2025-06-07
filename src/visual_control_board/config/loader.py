@@ -31,12 +31,12 @@ class ConfigLoader:
         self.actions_config = self._load_actions_config()
         
         if not self.ui_config:
-            logger.warning(f"UI configuration not loaded from {self.ui_config_path}")
+            logger.warning(f"UI configuration failed to load from {self.ui_config_path}. Check file existence and content.")
         else:
             logger.info(f"UI configuration loaded successfully from {self.ui_config_path}")
             
         if not self.actions_config:
-            logger.warning(f"Actions configuration not loaded from {self.actions_config_path}")
+            logger.warning(f"Actions configuration failed to load from {self.actions_config_path}. Check file existence and content.")
         else:
             logger.info(f"Actions configuration loaded successfully from {self.actions_config_path}")
 
@@ -48,6 +48,9 @@ class ConfigLoader:
         try:
             with open(self.ui_config_path, "r") as f:
                 data = yaml.safe_load(f)
+            if data is None: # Handle empty YAML file
+                logger.error(f"UI config file at {self.ui_config_path} is empty or contains only comments.")
+                return None
             return UIConfig(**data)
         except yaml.YAMLError as e:
             logger.error(f"Error parsing UI config YAML from {self.ui_config_path}: {e}", exc_info=True)
@@ -62,6 +65,9 @@ class ConfigLoader:
         try:
             with open(self.actions_config_path, "r") as f:
                 data = yaml.safe_load(f)
+            if data is None: # Handle empty YAML file
+                logger.error(f"Actions config file at {self.actions_config_path} is empty or contains only comments.")
+                return None
             return ActionsConfig(**data)
         except yaml.YAMLError as e:
             logger.error(f"Error parsing Actions config YAML from {self.actions_config_path}: {e}", exc_info=True)
