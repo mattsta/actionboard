@@ -173,12 +173,17 @@ class DynamicUpdateConfig(BaseModel):
 
 class SparklinePayload(BaseModel):
     """Payload for updating a button with a sparkline."""
-    data: List[float] = Field(..., description="List of numerical data points for the sparkline.")
-    color: Optional[str] = Field(
-        default="currentColor", 
-        description="CSS color string for the sparkline. Defaults to the button's text color."
+
+    data: List[float] = Field(
+        ..., description="List of numerical data points for the sparkline."
     )
-    stroke_width: Optional[float] = Field(default=1.5, description="Stroke width for the sparkline.")
+    color: Optional[str] = Field(
+        default="currentColor",
+        description="CSS color string for the sparkline. Defaults to the button's text color.",
+    )
+    stroke_width: Optional[float] = Field(
+        default=1.5, description="Stroke width for the sparkline."
+    )
     # view_box: Optional[str] = Field(default="0 0 100 30", description="SVG viewBox attribute.") # Keep fixed in JS for now
 
 
@@ -200,6 +205,6 @@ class ButtonContentUpdate(BaseModel):
         description="New custom CSS class for styling. Send an empty string ('') to remove the current custom style and revert to default button styling.",
     )
     sparkline: Optional[SparklinePayload] = Field(
-        default=None, 
-        description="Data and configuration for rendering a sparkline on the button. If provided, typically replaces the icon."
+        default=None,
+        description="Data and configuration for rendering a sparkline on the button. If provided, typically replaces the icon.",
     )
