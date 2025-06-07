@@ -108,7 +108,8 @@ def add_new_page(page_id: str, page_name: str, columns: int = 2):
     return stage_and_apply_current_config()
 
 def add_button_to_page(page_id: str, button_id: str, button_text: str, 
-                       action_id: str = "log_current_time_action", icon: str = "fas fa-cube"):
+                       action_id: str = "log_current_time_action", icon: str = "fas fa-cube",
+                       style_class: str = None):
     """Adds a new button to a specified page in 'current_config["ui_config"]'."""
     print(f"\nAttempting to add button: ID='{button_id}' to Page ID='{page_id}'")
     ui_conf = current_config["ui_config"]
@@ -134,13 +135,18 @@ def add_button_to_page(page_id: str, button_id: str, button_text: str,
     new_button = {
         "id": button_id,
         "text": button_text,
-        "icon_class": icon, # Can be None if we intend to start with a sparkline
+        "icon_class": icon, 
         "action_id": action_id, 
         "action_params": {} 
     }
+    if style_class:
+        new_button["style_class"] = style_class
+
     target_page["buttons"].append(new_button)
     print(f"Button '{button_text}' added to page '{target_page.get('name')}' in local configuration.")
-    return stage_and_apply_current_config()
+    # Note: stage_and_apply_current_config() is not called here, assuming it's called after all modifications.
+    return True
+
 
 def send_button_content_update(button_id: str, text: str = None, icon_class: str = None, 
                                style_class: str = None, sparkline_payload: dict = None):
@@ -151,7 +157,7 @@ def send_button_content_update(button_id: str, text: str = None, icon_class: str
     if text is not None:
         payload["text"] = text
         has_update = True
-    if icon_class is not None: # Sending icon_class will make JS hide sparkline
+    if icon_class is not None: 
         payload["icon_class"] = icon_class
         has_update = True
     if style_class is not None:
@@ -162,7 +168,7 @@ def send_button_content_update(button_id: str, text: str = None, icon_class: str
         has_update = True
     
     if not has_update:
-        print(f"No content changes specified for button '{button_id}'. Skipping update.")
+        # print(f"No content changes specified for button '{button_id}'. Skipping update.")
         return False
 
     try:
@@ -178,99 +184,84 @@ def send_button_content_update(button_id: str, text: str = None, icon_class: str
             print(f"Error details: {e}")
         return False
 
-# --- Sparkline Demo Specific ---
+# --- Demo Specific Data ---
 sparkline_data_points = []
-MAX_SPARKLINE_POINTS = 30 # Number of points to show on the sparkline
+MAX_SPARKLINE_POINTS = 30 
+ICONS_TO_CYCLE = ["fas fa-hourglass-start", "fas fa-hourglass-half", "fas fa-hourglass-end", "fas fa-sync fa-spin", "fas fa-bolt", "fas fa-star"]
+SPARKLINE_BASE_COLOR = "#17A2B8" # A nice teal color
 
 def generate_next_sparkline_value():
     """Generates a new value for the sparkline, simulating a time series."""
     if not sparkline_data_points:
-        return random.uniform(10, 20) # Start value
+        return random.uniform(10, 20) 
     
     last_value = sparkline_data_points[-1]
-    change = random.uniform(-2, 2.2) # Allow slightly more positive trend
+    change = random.uniform(-2.5, 2.7) 
     new_value = last_value + change
-    return max(0, min(new_value, 30)) # Clamp between 0 and 30 for example
+    return max(0, min(new_value, 30)) 
 
-def update_sparkline_data():
+def update_sparkline_data_list():
     """Adds a new data point and keeps the list at a max size."""
     global sparkline_data_points
     new_val = generate_next_sparkline_value()
     sparkline_data_points.append(new_val)
     if len(sparkline_data_points) > MAX_SPARKLINE_POINTS:
-        sparkline_data_points.pop(0) # Remove oldest point
+        sparkline_data_points.pop(0) 
 
-
-def run_live_update_demo(button_id: str, duration_seconds: int = 30):
-    """Runs a demo of live text, icon, and sparkline updates for a button."""
-    print(f"\n--- Starting Live Update Demo for Button ID: '{button_id}' (Duration: {duration_seconds}s) ---")
-    
+def initialize_sparkline_data():
     global sparkline_data_points
-    sparkline_data_points = [random.uniform(5, 25) for _ in range(MAX_SPARKLINE_POINTS // 2)] # Initial data
+    sparkline_data_points = [random.uniform(5, 25) for _ in range(MAX_SPARKLINE_POINTS // 2)]
 
-    icons_to_cycle = ["fas fa-hourglass-start", "fas fa-hourglass-half", "fas fa-hourglass-end", "fas fa-sync fa-spin", "fas fa-bolt"]
-    sparkline_colors = ["#FF5733", "#33FF57", "#3357FF", "#FF33A1", "#F1C40F"]
-    icon_index = 0
-    color_index = 0
+
+def run_all_demos(icon_text_button_id: str, sparkline_button_id: str, duration_seconds: int = 60):
+    print(f"\n--- Starting All Demos (Duration: {duration_seconds}s) ---")
+    
+    initialize_sparkline_data()
+    icon_idx = 0
     
     start_time = time.time()
-    last_text_update_time = 0
-    last_icon_or_sparkline_update_time = 0
-    update_mode_is_sparkline = True # Start with sparkline
+    last_icon_text_update_time = 0
+    last_sparkline_update_time = 0
 
     try:
         while time.time() - start_time < duration_seconds:
-            current_time_loop = time.time()
+            current_loop_time = time.time()
 
-            # Update text every 1 second
-            if current_time_loop - last_text_update_time >= 1:
+            # --- Icon/Text Demo Update (every 2 seconds) ---
+            if current_loop_time - last_icon_text_update_time >= 2:
                 time_str = time.strftime("%H:%M:%S")
                 random_val = random.randint(100, 999)
-                new_text_content = f"Live: {random_val} @ {time_str}"
-                # We send text updates separately or piggyback on icon/sparkline update
-                # For this demo, let's piggyback to reduce requests
-                # send_button_content_update(button_id, text=new_text_content) 
-                last_text_update_time = current_time_loop
-
-            # Update icon or sparkline every 0.5 seconds for sparkline, 3 for icon
-            update_interval = 0.3 if update_mode_is_sparkline else 3.0
-
-            if current_time_loop - last_icon_or_sparkline_update_time >= update_interval:
-                current_text_for_update = f"Mode: {'Spark' if update_mode_is_sparkline else 'Icon'} @ {time.strftime('%S')}"
-
-                if update_mode_is_sparkline:
-                    update_sparkline_data()
-                    sparkline_payload = {
-                        "data": list(sparkline_data_points), # Send a copy
-                        "color": sparkline_colors[color_index % len(sparkline_colors)],
-                        "stroke_width": 2
-                    }
-                    print(f"Updating SPARKLINE for '{button_id}': Color {sparkline_payload['color']}, Data points {len(sparkline_payload['data'])}")
-                    send_button_content_update(button_id, text=current_text_for_update, sparkline_payload=sparkline_payload)
-                    color_index +=1
-                else: # Icon mode
-                    new_icon_class = icons_to_cycle[icon_index % len(icons_to_cycle)]
-                    print(f"Updating ICON for '{button_id}': \"{new_icon_class}\"")
-                    send_button_content_update(button_id, text=current_text_for_update, icon_class=new_icon_class, sparkline_payload=None) # Explicitly no sparkline
-                    icon_index += 1
+                new_text_content = f"Icon: {random_val} @ {time_str}"
+                new_icon_class = ICONS_TO_CYCLE[icon_idx % len(ICONS_TO_CYCLE)]
                 
-                last_icon_or_sparkline_update_time = current_time_loop
+                print(f"Updating ICON/TEXT for '{icon_text_button_id}': Text \"{new_text_content}\", Icon \"{new_icon_class}\"")
+                send_button_content_update(icon_text_button_id, text=new_text_content, icon_class=new_icon_class)
+                
+                icon_idx += 1
+                last_icon_text_update_time = current_loop_time
 
-                # Switch mode every 6 seconds (approx)
-                if int(time.time() - start_time) % 8 < update_interval : # Switch roughly every 8s
-                     if int(time.time() - start_time) > 0: # Don't switch immediately at start
-                        update_mode_is_sparkline = not update_mode_is_sparkline
-                        print(f"--- Switched mode to {'SPARKLINE' if update_mode_is_sparkline else 'ICON'} ---")
-                        last_icon_or_sparkline_update_time = 0 # Force immediate update in new mode
+            # --- Sparkline Demo Update (every 0.5 seconds) ---
+            if current_loop_time - last_sparkline_update_time >= 0.5:
+                update_sparkline_data_list()
+                sparkline_payload = {
+                    "data": list(sparkline_data_points), 
+                    "color": SPARKLINE_BASE_COLOR,
+                    "stroke_width": 2
+                }
+                sparkline_text = f"Data Points: {len(sparkline_data_points)}"
+                
+                # print(f"Updating SPARKLINE for '{sparkline_button_id}': Color {sparkline_payload['color']}, Points {len(sparkline_payload['data'])}")
+                send_button_content_update(sparkline_button_id, text=sparkline_text, sparkline_payload=sparkline_payload)
+                last_sparkline_update_time = current_loop_time
             
-            time.sleep(0.1) # Loop interval
+            time.sleep(0.1) # Main loop interval
 
     except KeyboardInterrupt:
-        print("\nLive update demo interrupted by user.")
+        print("\nLive update demos interrupted by user.")
     finally:
-        print("--- Live Update Demo Finished ---")
-        # Reset button to a final state (e.g., an icon)
-        send_button_content_update(button_id, text="Demo Complete", icon_class="fas fa-check-circle", sparkline_payload=None)
+        print("--- All Demos Finished ---")
+        send_button_content_update(icon_text_button_id, text="Icon Demo Done", icon_class="fas fa-stop-circle")
+        send_button_content_update(sparkline_button_id, text="Sparkline Done", sparkline_payload={"data":[]}) # Clear sparkline
 
 
 # --- Main Execution ---
@@ -283,26 +274,41 @@ if __name__ == "__main__":
 
     # 1. Add a new page
     demo_page_id = "dynamic_demo_page"
-    if add_new_page(page_id=demo_page_id, page_name="Dynamic Demo Page", columns=1):
-        print("Pausing for 2 seconds for UI to update...")
-        time.sleep(2)
+    if not add_new_page(page_id=demo_page_id, page_name="Live Demos", columns=2):
+        print(f"Failed to add page '{demo_page_id}'. Exiting.")
+        sys.exit(1)
+    
+    # 2. Add buttons to this new page
+    # Button for Icon/Text Demo
+    icon_text_demo_button_id = "icon_text_live_button"
+    add_button_to_page(page_id=demo_page_id, 
+                       button_id=icon_text_demo_button_id, 
+                       button_text="Icon/Text Demo",
+                       action_id="log_current_time_action", 
+                       icon="fas fa-image",
+                       style_class="button-secondary")
 
-        # 2. Add a button to this new page
-        demo_button_id = "live_update_button"
-        if add_button_to_page(page_id=demo_page_id, 
-                              button_id=demo_button_id, 
-                              button_text="Live Demo Button",
-                              action_id="log_current_time_action", 
-                              icon="fas fa-rocket"): # Start with an icon
-            print("Pausing for 2 seconds for UI to update...")
-            time.sleep(2)
+    # Button for Sparkline Demo
+    sparkline_demo_button_id = "sparkline_live_button"
+    add_button_to_page(page_id=demo_page_id,
+                       button_id=sparkline_demo_button_id,
+                       button_text="Sparkline Demo",
+                       action_id="log_current_time_action", # Can be any valid action
+                       icon=None, # Start with no icon, sparkline will be added
+                       style_class="button-success")
+    
+    # Apply the new page and buttons configuration
+    if not stage_and_apply_current_config():
+        print("Failed to apply new page/buttons configuration. Exiting.")
+        sys.exit(1)
 
-            # 3. Run live updates on the new button
-            run_live_update_demo(button_id=demo_button_id, duration_seconds=45) # Increased duration
-        else:
-            print(f"Could not add button '{demo_button_id}', skipping live update demo.")
-    else:
-        print(f"Could not add page '{demo_page_id}', skipping further demonstrations.")
+    print("Pausing for 3 seconds for UI to update with new page and buttons...")
+    time.sleep(3)
+
+    # 3. Run live updates on the new buttons
+    run_all_demos(icon_text_button_id=icon_text_demo_button_id, 
+                  sparkline_button_id=sparkline_demo_button_id, 
+                  duration_seconds=60)
 
     print("\n----------------------------------------------")
     print("Dynamic controller script finished.")
