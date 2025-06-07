@@ -40,8 +40,14 @@
         <p>Visual Control Board</p>
         <!-- Area for toast messages / feedback -->
         <div id="toast-container">
-            {# Initial placeholder for OOB swaps. The actual toast content comes from toast.html partial #}
-            {# Example: <div id="toast-message" class="toast">Initial Toast Content (will be replaced)</div> #}
+            <!-- 
+                This div will be the target for Out-of-Band swaps of toast messages.
+                The toast.html partial defines a div with id="toast-message" and hx-swap-oob="true".
+                HTMX will swap the content of an existing #toast-message div if present,
+                or effectively insert it if the JS removes the previous one.
+                We add an empty div here to ensure the first toast has a target for replacement.
+            -->
+            <div id="toast-message"></div>
         </div>
     </footer>
 
@@ -50,25 +56,35 @@
         // For more complex JavaScript, consider moving this to a separate file in static/js/.
         document.body.addEventListener('htmx:afterSwap', function(event) {
             // Check if the swapped content includes our toast structure.
-            // The OOB swap targets #toast-container by placing a div with id="toast-message" inside it.
+            // The OOB swap targets #toast-container by placing a div with id="toast-message" inside it,
+            // or rather, it swaps an existing #toast-message element.
             const toastElement = document.getElementById('toast-message'); 
             
-            if (toastElement && toastElement.classList.contains('show')) {
+            if (toastElement && toastElement.classList.contains('show') && toastElement.textContent.trim() !== '') {
+                // Check textContent to ensure it's not the initial empty placeholder
                 setTimeout(() => {
                     toastElement.classList.remove('show');
                     // Optional: remove the element after fade out to keep DOM clean if many toasts appear
                     // and to ensure subsequent toasts with the same ID are correctly handled.
+                    // This also means the next toast (which is a div with id="toast-message") will be "newly" inserted.
                     setTimeout(() => {
                         if (toastElement.parentElement) {
                             // Check if it's still the same element before removing,
                             // in case a new toast replaced it quickly.
                             const currentToast = document.getElementById('toast-message');
                             if (currentToast === toastElement) {
-                                currentToast.remove();
+                                // Instead of removing, let's clear its content and hide it,
+                                // so it remains a target for the next OOB swap.
+                                // currentToast.remove(); 
+                                currentToast.innerHTML = ''; // Clear content
+                                currentToast.classList.remove('toast', 'show', 'error'); // Reset classes
                             }
                         }
                     }, 500); // Match CSS transition duration for fade-out
                 }, 3000); // Hide after 3 seconds
+            } else if (toastElement && toastElement.textContent.trim() === '' && !toastElement.classList.contains('show')) {
+                // This is likely the initial empty placeholder, do nothing or ensure it's hidden.
+                // It should not have 'show' class initially.
             }
         });
     </script>

@@ -1,4 +1,4 @@
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 from pydantic import BaseModel, Field
 
 class ButtonActionParams(BaseModel):
@@ -48,6 +48,26 @@ class PageConfig(BaseModel):
 
 class UIConfig(BaseModel):
     pages: List[PageConfig] = Field(..., description="List of pages in the UI.")
+
+    def find_button_and_page(self, button_id: str) -> Optional[Tuple[PageConfig, ButtonConfig]]:
+        """
+        Finds a button by its ID across all pages and returns it along with its parent page.
+
+        Args:
+            button_id: The ID of the button to find.
+
+        Returns:
+            A tuple containing the PageConfig and ButtonConfig if found, otherwise None.
+        """
+        if not self.pages:
+            return None
+        for page in self.pages:
+            if page.buttons:
+                for button in page.buttons:
+                    if button.id == button_id:
+                        return page, button
+        return None
+
 
 class ActionDefinition(BaseModel):
     id: str = Field(..., description="Unique identifier for the action.")

@@ -63,25 +63,24 @@ async def handle_button_action(
     """
     if not ui_config:
         logger.error(f"UI Configuration not available when handling action for button ID: {button_id}")
+        # This case should ideally be prevented by startup checks in main.py
         raise HTTPException(status_code=500, detail="UI Configuration not loaded. Cannot process button action.")
 
-    button_config: Optional[ButtonConfig] = None
-    originating_page_config: Optional[PageConfig] = None
-    for page in ui_config.pages:
-        for btn in page.buttons:
-            if btn.id == button_id:
-                button_config = btn
-                originating_page_config = page
-                break
-        if button_config:
-            break
+    found_config = ui_config.find_button_and_page(button_id)
     
-    if not button_config or not originating_page_config:
+    if not found_config:
         logger.warning(f"Button with ID '{button_id}' not found in UI configuration.")
+        # Return a 404 response that HTMX can handle, perhaps by showing an error toast.
+        # For now, raising HTTPException which will be a JSON response unless an exception handler is added.
+        # A more HTMX-friendly approach might be to return an error toast directly.
         raise HTTPException(status_code=404, detail=f"Button with ID '{button_id}' not found in UI configuration.")
 
+    originating_page_config, button_config = found_config
+    
     action_id = button_config.action_id
-    action_params = button_config.action_params or {}
+    # Ensure action_params is a dict, even if None or not present in config.
+    # Pydantic model default_factory for ButtonActionParams handles this.
+    action_params = button_config.action_params.model_dump() if button_config.action_params else {}
     
     logger.info(f"Received action for button ID: {button_id}, action ID: {action_id}, params: {action_params}")
 
@@ -89,38 +88,33 @@ async def handle_button_action(
 
     logger.info(f"Action '{action_id}' for button '{button_id}' executed. Result: {result}")
     
-    feedback_message = f"Action '{action_id}' triggered."
+    feedback_message = f"Action '{action_id}' completed." # Default message
     toast_class = "toast show" # Default success toast
 
     if isinstance(result, dict):
         if "error" in result:
             feedback_message = f"Error: {result['error']}"
-            toast_class = "toast show error" # Add an error class for styling
+            toast_class = "toast show error"
             logger.error(f"Action '{action_id}' for button '{button_id}' resulted in an error: {result['error']}")
         elif "message" in result:
             feedback_message = str(result["message"])
-    elif isinstance(result, str): # Simple string result
+    elif isinstance(result, str) and result: # Non-empty string result
         feedback_message = result
-    elif result is None: # Action might not return anything meaningful for UI
-        feedback_message = f"Action '{action_id}' completed."
-
+    # If result is None or an empty string, the default "completed" message is used.
 
     # Prepare OOB swap for the toast message
-    # Ensure toast_message id is unique if multiple toasts can appear, or it's always replaced.
-    # Current setup replaces #toast-message content.
     toast_html = templates.get_template("partials/toast.html").render({
-        "request": request, # Pass request for url_for if needed in toast, not currently used
-        "message_id": "toast-message-content", # ID for the content part of the toast
+        "request": request,
+        "message_id": "toast-message-content", 
         "message": feedback_message,
         "toast_class": toast_class
     })
-
 
     # Prepare the main content: re-render the button that was actioned.
     button_html = templates.get_template("partials/button.html").render({
         "request": request,
         "button": button_config,
-        "current_page": originating_page_config 
+        # "current_page": originating_page_config # Not strictly needed by button.html currently
     })
 
     final_html_content = toast_html + button_html
