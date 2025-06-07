@@ -26,7 +26,7 @@ function connectWebSocket() {
     };
 
     socket.onmessage = function(event) {
-        console.log("WebSocket message received:", event.data);
+        // console.log("WebSocket message received:", event.data); // Removed verbose log line
         try {
             const message = JSON.parse(event.data);
             if (message.type === "button_content_update" && message.payload) {
