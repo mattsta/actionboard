@@ -1,6 +1,7 @@
 from typing import List, Optional, Dict, Any, Tuple
 from pydantic import BaseModel, Field
 
+
 class ButtonActionParams(BaseModel):
     """
     Flexible model for action parameters.
@@ -17,7 +18,7 @@ class ButtonActionParams(BaseModel):
        the action function for validation.
     2. Implementing a discriminated union approach if a more complex, centralized
        validation scheme per action type is desired before dispatch.
-    
+
     Example:
         If `action_params` in `ui_config.yaml` is:
         ```yaml
@@ -27,56 +28,74 @@ class ButtonActionParams(BaseModel):
         ```
         The action function will receive `{"url": "http://example.com", "retries": 3}`.
     """
+
     class Config:
-        extra = "allow" # Allows any additional fields not explicitly defined.
+        extra = "allow"  # Allows any additional fields not explicitly defined.
+
 
 class ButtonConfig(BaseModel):
     """Configuration for a single button in the UI."""
-    id: str = Field(..., description="Unique identifier for the button. Used for targeting actions.")
+
+    id: str = Field(
+        ..., description="Unique identifier for the button. Used for targeting actions."
+    )
     text: str = Field(..., description="Text displayed on the button.")
     icon_class: Optional[str] = Field(
-        default=None, 
-        description="CSS class for an icon (e.g., FontAwesome 'fas fa-rocket')."
+        default=None,
+        description="CSS class for an icon (e.g., FontAwesome 'fas fa-rocket').",
     )
     style_class: Optional[str] = Field(
-        default=None, 
-        description="Custom CSS class for additional button styling (e.g., 'button-primary', 'button-danger')."
+        default=None,
+        description="Custom CSS class for additional button styling (e.g., 'button-primary', 'button-danger').",
     )
-    
+
     action_id: str = Field(
-        ..., 
-        description="Identifier of the action to be executed, as defined in actions_config.yaml."
+        ...,
+        description="Identifier of the action to be executed, as defined in actions_config.yaml.",
     )
     action_params: ButtonActionParams = Field(
-        default_factory=ButtonActionParams, 
-        description="Parameters to pass to the action function. Structure depends on the action."
+        default_factory=ButtonActionParams,
+        description="Parameters to pass to the action function. Structure depends on the action.",
     )
-    
+
     dynamic_content_url: Optional[str] = Field(
-        default=None, 
-        description="URL for dynamically fetching button content (e.g., text, icon). Deprecated in favor of WebSocket updates."
+        default=None,
+        description="URL for dynamically fetching button content (e.g., text, icon). Deprecated in favor of WebSocket updates.",
     )
+
 
 class PageConfig(BaseModel):
     """Configuration for a single page or view in the UI."""
-    name: str = Field(..., description="Display name of the page, often used as a title.")
+
+    name: str = Field(
+        ..., description="Display name of the page, often used as a title."
+    )
     id: str = Field(..., description="Unique identifier for the page.")
     layout: str = Field(
-        default="grid", 
-        description="Layout type for arranging buttons on the page (e.g., 'grid')."
+        default="grid",
+        description="Layout type for arranging buttons on the page (e.g., 'grid').",
     )
     grid_columns: Optional[int] = Field(
-        default=3, 
-        gt=0, 
-        description="Number of columns if layout is 'grid'. Must be greater than 0."
+        default=3,
+        gt=0,
+        description="Number of columns if layout is 'grid'. Must be greater than 0.",
     )
-    buttons: List[ButtonConfig] = Field(..., description="List of buttons to display on this page.")
+    buttons: List[ButtonConfig] = Field(
+        ..., description="List of buttons to display on this page."
+    )
+
 
 class UIConfig(BaseModel):
     """Root configuration model for the entire UI structure."""
-    pages: List[PageConfig] = Field(..., description="List of pages in the UI. Currently, only the first page is displayed.")
 
-    def find_button_and_page(self, button_id: str) -> Optional[Tuple[PageConfig, ButtonConfig]]:
+    pages: List[PageConfig] = Field(
+        ...,
+        description="List of pages in the UI. Currently, only the first page is displayed.",
+    )
+
+    def find_button_and_page(
+        self, button_id: str
+    ) -> Optional[Tuple[PageConfig, ButtonConfig]]:
         """
         Finds a button by its ID across all pages and returns it along with its parent page.
 
@@ -98,13 +117,26 @@ class UIConfig(BaseModel):
 
 class ActionDefinition(BaseModel):
     """Defines a single action that can be triggered by a button."""
-    id: str = Field(..., description="Unique identifier for the action. Referenced by ButtonConfig.action_id.")
-    module: str = Field(..., description="Python module path where the action function is defined (e.g., 'my_package.my_module').")
-    function: str = Field(..., description="Name of the action function within the specified module.")
+
+    id: str = Field(
+        ...,
+        description="Unique identifier for the action. Referenced by ButtonConfig.action_id.",
+    )
+    module: str = Field(
+        ...,
+        description="Python module path where the action function is defined (e.g., 'my_package.my_module').",
+    )
+    function: str = Field(
+        ..., description="Name of the action function within the specified module."
+    )
+
 
 class ActionsConfig(BaseModel):
     """Root configuration model for all available actions."""
-    actions: List[ActionDefinition] = Field(..., description="List of all action definitions available to the application.")
+
+    actions: List[ActionDefinition] = Field(
+        ..., description="List of all action definitions available to the application."
+    )
 
 
 class DynamicUpdateConfig(BaseModel):
@@ -112,15 +144,26 @@ class DynamicUpdateConfig(BaseModel):
     Model for receiving a full UI and Actions configuration update via API.
     This allows external services to propose a new set of configurations.
     """
+
     ui_config: UIConfig = Field(..., description="The complete new UI configuration.")
-    actions_config: ActionsConfig = Field(..., description="The complete new Actions configuration.")
+    actions_config: ActionsConfig = Field(
+        ..., description="The complete new Actions configuration."
+    )
+
 
 class ButtonContentUpdate(BaseModel):
     """
     Model for pushing live updates to a button's content via WebSocket.
     All fields are optional; only provided fields will be updated.
     """
+
     button_id: str = Field(..., description="The ID of the button to update.")
     text: Optional[str] = Field(default=None, description="New text for the button.")
-    icon_class: Optional[str] = Field(default=None, description="New FontAwesome icon class. Empty string or null to remove icon.")
-    style_class: Optional[str] = Field(default=None, description="New custom CSS class for styling. Empty string or null to remove custom style.")
+    icon_class: Optional[str] = Field(
+        default=None,
+        description="New FontAwesome icon class. Empty string or null to remove icon.",
+    )
+    style_class: Optional[str] = Field(
+        default=None,
+        description="New custom CSS class for styling. Empty string or null to remove custom style.",
+    )

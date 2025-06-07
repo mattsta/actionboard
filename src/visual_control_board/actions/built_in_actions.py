@@ -1,8 +1,9 @@
 import datetime
-import asyncio # For async example
+import asyncio  # For async example
 import logging
 
 logger = logging.getLogger(__name__)
+
 
 def greet_user_action(name: str = "User"):
     """
@@ -12,7 +13,7 @@ def greet_user_action(name: str = "User"):
 
     Args:
         name (str): The name of the user to greet. Defaults to "User".
-        
+
     Returns:
         dict: A dictionary containing the status and a greeting message.
               This dictionary is often used to provide feedback to the UI.
@@ -22,11 +23,12 @@ def greet_user_action(name: str = "User"):
     # The returned dictionary can be used by the frontend (e.g., to show a toast message)
     return {"status": "success", "message": message}
 
+
 def log_current_time_action():
     """
     Logs the current ISO formatted time to the server console and returns it
     along with a success message.
-    
+
     Returns:
         dict: A dictionary containing the status, current timestamp, and a message.
     """
@@ -35,35 +37,38 @@ def log_current_time_action():
     logger.info(f"Executing log_current_time_action. Time: {now}")
     return {"status": "success", "timestamp": now, "message": message}
 
+
 async def example_async_action(duration: int = 1):
     """
     An example of an asynchronous action that simulates a delay (e.g., a long-running task).
-    
+
     Args:
         duration (int): The number of seconds to wait. Defaults to 1.
-        
+
     Returns:
         dict: A dictionary containing the status, a completion message, and the duration.
     """
     message_start = f"Starting async action (simulated duration: {duration}s)..."
     logger.info(message_start)
-    
-    await asyncio.sleep(duration) # Simulate an I/O bound operation
-    
+
+    await asyncio.sleep(duration)  # Simulate an I/O bound operation
+
     message_end = f"Async action completed after {duration}s."
     logger.info(message_end)
     return {"status": "success", "message": message_end, "duration": duration}
 
+
 def another_action():
     """
     Another simple placeholder synchronous action for demonstration purposes.
-    
+
     Returns:
         dict: A dictionary containing the status and a generic message.
     """
     message = "The 'another_action' was performed successfully!"
     logger.info("Executing another_action")
     return {"status": "success", "message": message}
+
 
 # To add more actions:
 # 1. Define your Python function here (or in another module).
