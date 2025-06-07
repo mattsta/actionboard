@@ -42,7 +42,25 @@ It leverages:
 
 ## Data Flow: Page Navigation (HTMX)
 
-(Remains as previously described.)
+1.  **Initial Load:**
+    *   User navigates to `/` (or `/page/{default_page_id}`).
+    *   The server renders `index.html`, including the navigation tabs (`partials/nav.html`) with the default page marked active, and the button grid (`partials/page_content.html`) for the default page.
+2.  **User Clicks a Tab:**
+    *   The clicked tab (an `<a>` tag) has HTMX attributes (e.g., `hx-get="/content/page/{new_page_id}"`, `hx-target="#page-content-area"`).
+    *   HTMX makes an AJAX GET request to `/content/page/{new_page_id}`.
+3.  **Backend Response for Page Content:**
+    *   The `/content/page/{new_page_id}` route handler:
+        *   Retrieves the `PageConfig` for `{new_page_id}`.
+        *   Renders the button grid for this page using `partials/page_content.html`.
+        *   Renders the navigation tabs again using `partials/nav.html`, marking the `{new_page_id}` tab as active. This HTML is intended for an Out-of-Band (OOB) swap.
+        *   Renders updated `<title>` and `<h1>` tags using respective partials, also for OOB swaps.
+        *   Returns a combined HTML response containing the main page content and the OOB partials.
+4.  **Client-Side DOM Update (HTMX):**
+    *   HTMX receives the response.
+    *   It swaps the main content (button grid) into the `#page-content-area` div.
+    *   It processes OOB swaps: updates the navigation tabs in `#page-navigation`, the `<title>` tag, and the `<h1>` tag.
+    *   The URL is updated via `hx-push-url` if configured on the tab link.
+5.  **User Sees New Page:** The selected page's buttons and title are displayed without a full page reload.
 
 ## Data Flow: Live Button Content Update (Icon or Sparkline)
 
@@ -71,7 +89,41 @@ It leverages:
 
 ## Data Flow: Dynamic Configuration Update (Full Board) & Live Navigation Update
 
-(Remains as previously described.)
+1.  **Staging a New Configuration:**
+    *   An external system (e.g., a script, another service, or a manual `curl` command) sends an HTTP `POST` request to `/api/v1/config/stage`.
+    *   The request body contains a JSON payload matching `DynamicUpdateConfig`, which includes both a full `ui_config` and `actions_config`.
+    *   The `stage_new_configuration` route handler:
+        *   Validates the new `actions_config` by attempting to load them into a temporary `ActionRegistry`. If any action fails to load (e.g., module not found, function not found), it returns an error.
+        *   If validation passes, stores the new `ui_config` and `actions_config` in `request.app.state.staged_ui_config` and `request.app.state.staged_actions_config`.
+        *   Sets `request.app.state.pending_update_available = True`.
+        *   Returns an HTML partial (`partials/update_banner.html`) indicating an update is available. This partial is swapped into the `#update-notification-area` on the client via HTMX's OOB swap.
+2.  **User Interaction with Update Banner:**
+    *   The user sees the banner with "Apply Update" and "Discard" buttons.
+3.  **Applying the Staged Configuration:**
+    *   User (or script like `dynamic_board_controller.py`) triggers `POST` to `/api/v1/config/apply`.
+    *   The `apply_staged_configuration` route handler:
+        *   Moves configurations from `staged_*` to `current_*` in `app.state`.
+        *   Re-initializes the main `app.state.action_registry` with the new `current_actions_config`.
+        *   Clears the `staged_*` configurations and sets `pending_update_available = False`.
+        *   **Crucially, it now also calls `live_update_mgr.broadcast_json({"type": "navigation_update", "payload": {}})` to notify all connected WebSocket clients.**
+        *   For the client that made the `/apply` request (if it's a browser via the banner button), it returns a response with the `HX-Refresh: true` header.
+4.  **Client-Side Updates:**
+    *   **Initiating Client (via UI Banner):** Detects `HX-Refresh: true` and performs a full page reload. The reloaded page will have the new navigation and content.
+    *   **Other Connected Clients (and `dynamic_board_controller.py`'s effect on browsers):**
+        *   The JavaScript in `static/js/main.js` receives the `{"type": "navigation_update"}` WebSocket message.
+        *   The `refreshNavigationPanel()` JavaScript function is called.
+        *   This function determines the client's current active page ID from the DOM.
+        *   It makes an HTMX AJAX `GET` request to `/content/navigation_panel?active_page_id={id}`.
+        *   The server responds with the HTML for the updated navigation tabs, rendered with the correct active tab.
+        *   HTMX swaps this new HTML into the `#page-navigation` element using `outerHTML` swap.
+        *   `htmx.process()` is then called on the new `#page-navigation` element to initialize HTMX behaviors on the new links.
+        *   Users on these clients see the navigation tabs update (e.g., new tab appears/disappears) without a full page reload.
+5.  **Discarding the Staged Configuration:**
+    *   User clicks "Discard".
+    *   HTMX sends a `POST` request to `/api/v1/config/discard`.
+    *   The `discard_staged_configuration` route handler:
+        *   Clears the `staged_*` configurations and sets `pending_update_available = False`.
+        *   Returns an HTML partial (`partials/update_banner.html` rendered as hidden) to clear the banner from the UI.
 
 ## Extensibility
 
