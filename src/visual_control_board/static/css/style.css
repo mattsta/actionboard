@@ -1,0 +1,138 @@
+body {
+    font-family: sans-serif;
+    margin: 0;
+    background-color: #f4f4f4;
+    color: #333;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+header {
+    background-color: #333;
+    color: white;
+    padding: 1rem;
+    text-align: center;
+}
+
+.container {
+    flex-grow: 1;
+    padding: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.button-grid {
+    display: grid;
+    gap: 15px;
+    /* grid-template-columns is set inline based on config */
+}
+
+.control-button {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 20px;
+    text-align: center;
+    text-decoration: none;
+    font-size: 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100px; /* Ensure buttons have some height */
+    word-break: break-word;
+}
+
+.control-button:hover {
+    background-color: #0056b3;
+}
+
+.control-button i {
+    font-size: 24px; /* Icon size */
+    margin-bottom: 8px;
+}
+
+.control-button .button-text {
+    font-size: 14px;
+}
+
+/* Example of a secondary button style */
+.button-secondary {
+    background-color: #6c757d;
+}
+.button-secondary:hover {
+    background-color: #545b62;
+}
+
+/* Example of a success button style */
+.button-success {
+    background-color: #28a745;
+}
+.button-success:hover {
+    background-color: #1e7e34;
+}
+
+/* Example of a danger button style */
+.button-danger {
+    background-color: #dc3545;
+}
+.button-danger:hover {
+    background-color: #b02a37;
+}
+
+
+footer {
+    background-color: #333;
+    color: white;
+    text-align: center;
+    padding: 0.5rem;
+    margin-top: auto;
+    font-size: 0.8em;
+}
+
+/* Toast / Notification Styling */
+#toast-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1000;
+    display: flex; /* Allow multiple toasts to stack if you evolve this */
+    flex-direction: column-reverse; /* New toasts appear on top */
+    gap: 10px;
+}
+
+.toast {
+    background-color: #333; /* Default success/info toast */
+    color: white;
+    padding: 15px;
+    border-radius: 5px;
+    /* margin-bottom: 10px; Removed for gap in container */
+    opacity: 0;
+    transition: opacity 0.5s ease-in-out, transform 0.3s ease-out;
+    min-width: 250px;
+    text-align: left;
+    transform: translateY(20px); /* Start slightly off-screen for entry animation */
+}
+
+.toast.show {
+    opacity: 0.9;
+    transform: translateY(0);
+}
+
+.toast.error {
+    background-color: #dc3545; /* Red for errors */
+    color: white;
+}
+
+
+.error-message {
+    color: red;
+    background-color: #ffebee;
+    border: 1px solid red;
+    padding: 10px;
+    border-radius: 5px;
+}
