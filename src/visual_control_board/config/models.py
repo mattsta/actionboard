@@ -90,7 +90,7 @@ class UIConfig(BaseModel):
 
     pages: List[PageConfig] = Field(
         ...,
-        description="List of pages in the UI. Currently, only the first page is displayed.",
+        description="List of pages in the UI. The application now supports navigation between these pages.",
     )
 
     def find_button_and_page(
@@ -112,6 +112,23 @@ class UIConfig(BaseModel):
                 for button in page.buttons:
                     if button.id == button_id:
                         return page, button
+        return None
+
+    def find_page(self, page_id: str) -> Optional[PageConfig]:
+        """
+        Finds a page by its ID.
+
+        Args:
+            page_id: The ID of the page to find.
+
+        Returns:
+            The PageConfig if found, otherwise None.
+        """
+        if not self.pages:
+            return None
+        for page in self.pages:
+            if page.id == page_id:
+                return page
         return None
 
 

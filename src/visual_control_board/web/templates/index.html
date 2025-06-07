@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ page_title | default("Visual Control Board") }}</title>
+    <title id="page-title" hx-swap-oob="true">{{ page_title | default("Visual Control Board") }}</title>
     <!-- Link to the main stylesheet -->
     <link rel="stylesheet" href="{{ url_for('static', path='/css/style.css') }}">
     <!-- FontAwesome for icons (optional, used if button.icon_class is set) -->
@@ -13,47 +13,34 @@
 </head>
 <body>
     <header>
-        <!-- Display current page name or default title -->
-        <h1>{{ current_page.name if current_page else page_title | default("Control Board") }}</h1>
+        <h1 id="page-header-title" hx-swap-oob="true">{{ current_page.name if current_page else "Control Board" }}</h1>
+        
+        <!-- Navigation Tabs Area -->
+        {% include "partials/nav.html" with context %}
     </header>
 
     <!-- Area for update notifications -->
     <div id="update-notification-area" class="update-notification-container">
-        {# The partials/update_banner.html will be rendered here by API calls or on initial load #}
         {% include "partials/update_banner.html" with context %}
     </div>
 
     <main class="container">
-        {% if error %}
-            <!-- Display an error message if passed from the route -->
-            <div class="error-message">{{ error }}</div>
-        {% elif current_page and current_page.buttons %}
-            <!-- Main button grid area -->
-            <div 
-                class="button-grid" 
-                {% if current_page.layout == 'grid' and current_page.grid_columns %}
-                    style="grid-template-columns: repeat({{ current_page.grid_columns }}, 1fr);"
-                {% endif %}
-            >
-                {# Loop through buttons for the current page and include the button partial #}
-                {% for button in current_page.buttons %}
-                    {% with button=button, request=request %} {# Pass button and request context to the partial #}
-                        {% include "partials/button.html" %}
-                    {% endwith %}
-                {% endfor %}
-            </div>
-        {% elif current_page %}
-             <!-- Message if the current page has no buttons configured -->
-             <p>No buttons configured for page: '{{ current_page.name }}'.</p>
-             <p>Please check your <code>ui_config.yaml</code>.</p>
-        {% else %}
-            <!-- Fallback message if no page or buttons are available -->
-            <p>No page or buttons configured to display.</p>
-            <p>Please ensure your <code>ui_config.yaml</code> is correctly set up.
-            The application looks for configurations in <code>user_config/</code> at the project root first,
-            then falls back to <code>config_examples/</code>. Check server logs for more details if issues persist.
-            </p>
-        {% endif %}
+        <!-- This div will hold the content of the currently selected page -->
+        <div id="page-content-area">
+            {% if error %}
+                <div class="error-message">{{ error }}</div>
+            {% elif current_page %}
+                {% with page=current_page, request=request %}
+                    {% include "partials/page_content.html" %}
+                {% endwith %}
+            {% else %}
+                <p>No page or buttons configured to display.</p>
+                <p>Please ensure your <code>ui_config.yaml</code> is correctly set up.
+                The application looks for configurations in <code>user_config/</code> at the project root first,
+                then falls back to <code>config_examples/</code>. Check server logs for more details if issues persist.
+                </p>
+            {% endif %}
+        </div>
     </main>
 
     <footer>

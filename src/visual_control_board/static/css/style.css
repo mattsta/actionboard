@@ -15,11 +15,61 @@ header {
     text-align: center;
 }
 
+header h1 {
+    margin-bottom: 0.5rem; /* Space between title and nav tabs */
+}
+
+/* --- Navigation Tabs Styling --- */
+.nav-tabs {
+    background-color: #444; /* Slightly lighter than header for tab bar */
+    padding: 0 1rem;
+    text-align: center;
+    border-bottom: 2px solid #555;
+}
+
+.nav-tabs ul {
+    list-style-type: none;
+    margin: 0;
+    padding: 0;
+    display: inline-block; /* Center the tabs */
+}
+
+.nav-tabs li {
+    display: inline-block; /* Tabs side-by-side */
+    margin-right: 5px; /* Space between tabs */
+}
+
+.nav-tabs .nav-link {
+    display: block;
+    padding: 10px 15px;
+    color: #ccc; /* Light grey text for inactive tabs */
+    text-decoration: none;
+    border-radius: 5px 5px 0 0; /* Rounded top corners */
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.nav-tabs .nav-link:hover {
+    background-color: #555; /* Darker background on hover */
+    color: #fff;
+}
+
+.nav-tabs .nav-link.active {
+    background-color: #f4f4f4; /* Match page background for active tab */
+    color: #333; /* Match page text color for active tab */
+    border-bottom: 2px solid #f4f4f4; /* Visually connect to content area */
+    font-weight: bold;
+}
+
+
 .container {
     flex-grow: 1; /* Allows main content to expand */
     padding: 20px;
     max-width: 1200px; /* Max width for content */
     margin: 0 auto; /* Center content */
+}
+
+#page-content-area {
+    padding-top: 10px; /* Add some space if nav tabs are directly above */
 }
 
 .button-grid {

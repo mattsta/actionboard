@@ -1,0 +1,17 @@
+{# Renders the button grid for a specific page. Expects `page` (PageConfig) and `request` in context. #}
+{# This div is the target for page content swaps. #}
+<div class="button-grid" 
+    {% if page.layout == 'grid' and page.grid_columns %}
+        style="grid-template-columns: repeat({{ page.grid_columns }}, 1fr);"
+    {% endif %}
+>
+    {% if page.buttons %}
+        {% for button in page.buttons %}
+            {% with button=button, request=request %}
+                {% include "partials/button.html" %}
+            {% endwith %}
+        {% endfor %}
+    {% else %}
+        <p>No buttons configured for page: '{{ page.name }}'.</p>
+    {% endif %}
+</div>

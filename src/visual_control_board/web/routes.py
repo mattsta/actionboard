@@ -10,7 +10,7 @@ from fastapi import (
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 import logging
 import json  # For WebSocket message parsing if needed, though send_json/receive_json handle it
 
@@ -181,53 +181,140 @@ async def websocket_button_updates_endpoint(
 
 
 # Main UI routes
-@router.get("/", response_class=HTMLResponse)
+def _render_index_page(
+    request: Request,
+    ui_config: UIConfig,
+    current_page_id: str,
+    pending_update_available: bool,
+    error_message: Optional[str] = None,
+    status_code: int = 200,
+):
+    current_page: Optional[PageConfig] = ui_config.find_page(current_page_id)
+    all_pages: List[PageConfig] = ui_config.pages if ui_config else []
+
+    if not current_page and all_pages: # If current_page_id is invalid but there are pages, default to first
+        current_page = all_pages[0]
+        current_page_id = current_page.id
+        logger.warning(f"Requested page_id '{current_page_id}' not found, defaulting to first page '{current_page.id}'.")
+    elif not current_page and not all_pages: # No pages configured at all
+        logger.error("No pages configured in UIConfig.")
+        error_message = error_message or "UI Configuration has no pages."
+        # Fall through to render with error
+    elif not current_page: # Specific page_id not found, but other pages exist
+        logger.warning(f"Requested page_id '{current_page_id}' not found. Valid pages: {[p.id for p in all_pages]}")
+        # This case should ideally be handled by defaulting or a specific error message
+        # For now, let it fall through, it might show an error or an empty content area if current_page is None
+
+    page_title = f"{current_page.name} - Visual Control Board" if current_page else "Visual Control Board"
+    if error_message:
+        page_title = "Error - Visual Control Board"
+
+
+    context = {
+        "request": request,
+        "page_title": page_title,
+        "all_pages": all_pages,
+        "current_page_id": current_page.id if current_page else None,
+        "current_page": current_page, # This is the PageConfig object for the content area
+        "error": error_message,
+        "pending_update_available": pending_update_available,
+    }
+    return templates.TemplateResponse("index.html", context, status_code=status_code)
+
+
+@router.get("/", response_class=HTMLResponse, name="get_index_page_root")
+@router.get("/page/{page_id:str}", response_class=HTMLResponse, name="get_index_page_with_page_id")
 async def get_index_page(
     request: Request,
-    ui_config: Optional[UIConfig] = Depends(get_ui_config),
+    page_id: Optional[str] = None, # Comes from path parameter
+    ui_config: UIConfig = Depends(get_ui_config),
     pending_update_available: bool = Depends(get_pending_update_flag),
 ):
     if not ui_config or not ui_config.pages:
-        logger.warning(
-            "UI Configuration not found or no pages defined when serving index page."
-        )
-        return templates.TemplateResponse(
-            "index.html",
-            {
-                "request": request,
-                "page_title": "Error - Visual Control Board",
-                "current_page": None,
-                "error": "UI Configuration not found or is empty.",
-                "pending_update_available": pending_update_available,
-            },
-            status_code=500,
+        logger.warning("UI Configuration not found or no pages defined.")
+        return _render_index_page(
+            request, ui_config, None, pending_update_available,
+            error_message="UI Configuration not found or is empty.",
+            status_code=500
         )
 
-    current_page = ui_config.pages[0]
-    logger.info(
-        f"Serving index page with content from page: '{current_page.name}' (ID: {current_page.id})"
+    initial_page_id = page_id or ui_config.pages[0].id
+    
+    current_page_obj = ui_config.find_page(initial_page_id)
+    if not current_page_obj:
+        logger.warning(f"Initial page ID '{initial_page_id}' not found. Defaulting to first available page.")
+        initial_page_id = ui_config.pages[0].id # Default to the first page if specified ID is invalid
+
+    return _render_index_page(
+        request, ui_config, initial_page_id, pending_update_available
     )
 
-    return templates.TemplateResponse(
-        "index.html",
-        {
+
+@router.get("/content/page/{page_id:str}", response_class=HTMLResponse, name="get_page_content")
+async def get_page_content_partial(
+    request: Request,
+    page_id: str,
+    ui_config: UIConfig = Depends(get_ui_config),
+    pending_update_available: bool = Depends(get_pending_update_flag), # Keep context consistent
+):
+    if not ui_config:
+        raise HTTPException(status_code=503, detail="UI configuration is currently unavailable.")
+
+    selected_page = ui_config.find_page(page_id)
+    if not selected_page:
+        logger.warning(f"Page ID '{page_id}' not found for content rendering.")
+        # Return an error message within the content area
+        error_content = templates.get_template("partials/page_content.html").render({
             "request": request,
-            "page_title": f"{current_page.name} - Visual Control Board",
-            "current_page": current_page,
-            "error": None,
-            "pending_update_available": pending_update_available,
-        },
-    )
+            "page": PageConfig(name="Error", id="error", buttons=[]), # Dummy page for structure
+            "error": f"Page '{page_id}' not found."
+        })
+        # Also update nav to show no active tab or handle gracefully
+        nav_html = templates.get_template("partials/nav.html").render({
+            "request": request,
+            "all_pages": ui_config.pages,
+            "current_page_id": None, # No page is active
+        })
+        title_html = templates.get_template("partials/title_tag.html").render({"page_title": "Page Not Found"})
+        header_title_html = templates.get_template("partials/header_title_tag.html").render({"header_title": "Page Not Found"})
+
+        return HTMLResponse(content=error_content + nav_html + title_html + header_title_html)
+
+    # Render page content
+    page_content_html = templates.get_template("partials/page_content.html").render({
+        "request": request,
+        "page": selected_page
+    })
+
+    # Render updated navigation (for OOB swap, to set active class)
+    nav_html = templates.get_template("partials/nav.html").render({
+        "request": request,
+        "all_pages": ui_config.pages,
+        "current_page_id": selected_page.id,
+        "pending_update_available": pending_update_available # Pass this through
+    })
+    
+    # Render updated page title (for OOB swap)
+    new_page_title = f"{selected_page.name} - Visual Control Board"
+    title_html = templates.get_template("partials/title_tag.html").render({"page_title": new_page_title})
+    
+    # Render updated header title (for OOB swap)
+    header_title_html = templates.get_template("partials/header_title_tag.html").render({"header_title": selected_page.name})
+
+    # Combine all parts for the response
+    # The main page content is first, then OOB swaps
+    full_response_content = page_content_html + nav_html + title_html + header_title_html
+    return HTMLResponse(content=full_response_content)
 
 
 @router.post("/action/{button_id}", response_class=HTMLResponse)
 async def handle_button_action(
     request: Request,
     button_id: str,
-    ui_config: Optional[UIConfig] = Depends(get_ui_config),
+    ui_config: UIConfig = Depends(get_ui_config), # Changed from Optional
     action_registry: ActionRegistry = Depends(get_action_registry),
 ):
-    if not ui_config:
+    if not ui_config: # Should be caught by dependency if critical, but good check
         logger.critical(f"UI Configuration not available for button ID: {button_id}.")
         error_message = "Critical Error: UI Configuration not loaded."
         toast_html = templates.get_template("partials/toast.html").render(
@@ -237,6 +324,7 @@ async def handle_button_action(
                 "toast_class": "toast show error",
             }
         )
+        # Return only toast as button context is missing
         return HTMLResponse(content=toast_html, status_code=500)
 
     found_config = ui_config.find_button_and_page(button_id)
@@ -251,9 +339,11 @@ async def handle_button_action(
                 "toast_class": "toast show error",
             }
         )
+        # Attempt to re-render the button if possible, or just send toast
+        # For now, just toast if button not found, as we can't re-render it.
         return HTMLResponse(content=toast_html)
 
-    originating_page_config, button_config = found_config
+    _originating_page_config, button_config = found_config # _originating_page_config not used here
     action_id = button_config.action_id
     action_params = button_config.action_params.model_dump()
 
@@ -288,10 +378,11 @@ async def handle_button_action(
             "toast_class": toast_class,
         }
     )
+    # Re-render the button itself (its state might not have changed, but this is standard practice)
     button_html = templates.get_template("partials/button.html").render(
         {
             "request": request,
-            "button": button_config,
+            "button": button_config, # Use the button_config from the current UIConfig
         }
     )
     final_html_content = toast_html + button_html
@@ -301,3 +392,10 @@ async def handle_button_action(
 # Include the sub-routers in the main app router
 router.include_router(config_router)
 router.include_router(live_updates_router)
+
+# Need to create these simple partials for OOB title/header swaps
+# src/visual_control_board/web/templates/partials/title_tag.html
+# <title id="page-title" hx-swap-oob="true">{{ page_title }}</title>
+
+# src/visual_control_board/web/templates/partials/header_title_tag.html
+# <h1 id="page-header-title" hx-swap-oob="true">{{ header_title }}</h1>

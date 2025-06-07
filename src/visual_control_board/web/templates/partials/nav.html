@@ -1,0 +1,18 @@
+{# Renders navigation tabs. Expects `all_pages` (List[PageConfig]), `current_page_id` (str), and `request` in context. #}
+{# This entire nav block can be swapped Out-Of-Band. #}
+<nav id="page-navigation" class="nav-tabs" hx-swap-oob="true">
+    <ul>
+        {% for page in all_pages %}
+        <li>
+            <a href="{{ url_for('get_page_content', page_id=page.id) }}"
+               class="nav-link {% if page.id == current_page_id %}active{% endif %}"
+               hx-get="{{ url_for('get_page_content', page_id=page.id) }}"
+               hx-push-url="{{ url_for('get_index_page_with_page_id', page_id=page.id) }}"
+               hx-target="#page-content-area"
+               hx-swap="innerHTML">
+                {{ page.name }}
+            </a>
+        </li>
+        {% endfor %}
+    </ul>
+</nav>
