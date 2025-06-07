@@ -5,7 +5,7 @@
     data-button-id="{{ button.id }}" {# Explicit data attribute for easier JS selection if needed #}
     data-current-style-class="{{ button.style_class | default('') }}" {# Store current style for JS updates #}
     hx-post="{{ url_for('handle_button_action', button_id=button.id) }}"
-    hx-swap="outerHTML" {# Replaces the button itself with the response from this POST #}
+    hx-swap="none" {# Changed from outerHTML to none. Prevents button re-render, OOB swaps (like toast) still work. #}
     title="{{ button.text }}"
 >
     {% if button.icon_class %}
