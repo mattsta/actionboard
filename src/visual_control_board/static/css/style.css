@@ -1,138 +1,151 @@
 body {
     font-family: sans-serif;
     margin: 0;
-    background-color: #f4f4f4;
-    color: #333;
+    background-color: #f4f4f4; /* Light grey background */
+    color: #333; /* Dark grey text */
     display: flex;
     flex-direction: column;
-    min-height: 100vh;
+    min-height: 100vh; /* Ensure footer stays at bottom */
 }
 
 header {
-    background-color: #333;
+    background-color: #333; /* Dark header background */
     color: white;
     padding: 1rem;
     text-align: center;
 }
 
 .container {
-    flex-grow: 1;
+    flex-grow: 1; /* Allows main content to expand */
     padding: 20px;
-    max-width: 1200px;
-    margin: 0 auto;
+    max-width: 1200px; /* Max width for content */
+    margin: 0 auto; /* Center content */
 }
 
 .button-grid {
     display: grid;
-    gap: 15px;
-    /* grid-template-columns is set inline based on config */
+    gap: 15px; /* Space between buttons */
+    /* grid-template-columns is set inline via style attribute based on PageConfig.grid_columns */
 }
 
 .control-button {
-    background-color: #007bff;
+    background-color: #007bff; /* Default primary blue */
     color: white;
     border: none;
     padding: 20px;
     text-align: center;
     text-decoration: none;
     font-size: 16px;
-    border-radius: 8px;
+    border-radius: 8px; /* Rounded corners */
     cursor: pointer;
-    transition: background-color 0.3s ease;
+    transition: background-color 0.3s ease; /* Smooth hover transition */
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    min-height: 100px; /* Ensure buttons have some height */
-    word-break: break-word;
+    min-height: 100px; /* Ensure buttons have a consistent minimum height */
+    word-break: break-word; /* Prevent long text from breaking layout */
 }
 
 .control-button:hover {
-    background-color: #0056b3;
+    background-color: #0056b3; /* Darker blue on hover */
 }
 
+/* Icon styling within buttons */
 .control-button i {
     font-size: 24px; /* Icon size */
-    margin-bottom: 8px;
+    margin-bottom: 8px; /* Space between icon and text */
 }
 
+/* Text styling within buttons */
 .control-button .button-text {
     font-size: 14px;
 }
 
-/* Example of a secondary button style */
+/* --- Custom Button Styles (examples) --- */
+/* These can be applied using 'style_class' in ui_config.yaml */
+
+/* Primary button style (matches default if not overridden, added for completeness) */
+.button-primary {
+    background-color: #007bff;
+}
+.button-primary:hover {
+    background-color: #0056b3;
+}
+
+/* Secondary button style */
 .button-secondary {
-    background-color: #6c757d;
+    background-color: #6c757d; /* Grey */
 }
 .button-secondary:hover {
-    background-color: #545b62;
+    background-color: #545b62; /* Darker grey */
 }
 
-/* Example of a success button style */
+/* Success button style */
 .button-success {
-    background-color: #28a745;
+    background-color: #28a745; /* Green */
 }
 .button-success:hover {
-    background-color: #1e7e34;
+    background-color: #1e7e34; /* Darker green */
 }
 
-/* Example of a danger button style */
+/* Danger button style */
 .button-danger {
-    background-color: #dc3545;
+    background-color: #dc3545; /* Red */
 }
 .button-danger:hover {
-    background-color: #b02a37;
+    background-color: #b02a37; /* Darker red */
 }
 
-
+/* --- Footer Styling --- */
 footer {
-    background-color: #333;
+    background-color: #333; /* Dark footer background */
     color: white;
     text-align: center;
-    padding: 0.5rem;
-    margin-top: auto;
+    padding: 0.5rem; /* Smaller padding than header */
+    margin-top: auto; /* Pushes footer to bottom if content is short */
     font-size: 0.8em;
 }
 
-/* Toast / Notification Styling */
+/* --- Toast / Notification Styling --- */
 #toast-container {
-    position: fixed;
+    position: fixed; /* Stays in place on scroll */
     bottom: 20px;
     right: 20px;
-    z-index: 1000;
-    display: flex; /* Allow multiple toasts to stack if you evolve this */
-    flex-direction: column-reverse; /* New toasts appear on top */
-    gap: 10px;
+    z-index: 1000; /* Ensures toast is on top of other elements */
+    display: flex;
+    flex-direction: column-reverse; /* New toasts appear above older ones if multiple were shown */
+    gap: 10px; /* Space between toasts if multiple are stacked */
 }
 
 .toast {
-    background-color: #333; /* Default success/info toast */
+    background-color: #333; /* Default background (often for info/success) */
     color: white;
     padding: 15px;
     border-radius: 5px;
-    /* margin-bottom: 10px; Removed for gap in container */
-    opacity: 0;
+    opacity: 0; /* Start hidden for entry animation */
     transition: opacity 0.5s ease-in-out, transform 0.3s ease-out;
-    min-width: 250px;
+    min-width: 250px; /* Minimum width for readability */
     text-align: left;
-    transform: translateY(20px); /* Start slightly off-screen for entry animation */
+    transform: translateY(20px); /* Start slightly off-screen below for entry animation */
 }
 
 .toast.show {
-    opacity: 0.9;
-    transform: translateY(0);
+    opacity: 0.9; /* Slightly transparent */
+    transform: translateY(0); /* Animate to final position */
 }
 
 .toast.error {
-    background-color: #dc3545; /* Red for errors */
+    background-color: #dc3545; /* Red background for error toasts */
     color: white;
 }
 
-
+/* --- Error Message Styling (for general page errors, not toasts) --- */
 .error-message {
     color: red;
-    background-color: #ffebee;
+    background-color: #ffebee; /* Light pink background */
     border: 1px solid red;
     padding: 10px;
     border-radius: 5px;
+    margin-bottom: 15px; /* Space below the error message */
 }

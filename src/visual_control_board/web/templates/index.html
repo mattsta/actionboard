@@ -4,37 +4,46 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ page_title | default("Visual Control Board") }}</title>
+    <!-- Link to the main stylesheet -->
     <link rel="stylesheet" href="{{ url_for('static', path='/css/style.css') }}">
-    <!-- FontAwesome for icons (optional, if you use icon_class) -->
+    <!-- FontAwesome for icons (optional, used if button.icon_class is set) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- HTMX library -->
     <script src="https://unpkg.com/htmx.org@1.9.10" integrity="sha384-D1Kt99CQMDuVetoL1lrYwg5t+9QdHe7NLX/SoJYkXDFfX37iInKRy5xLSi8nO7UC" crossorigin="anonymous"></script>
 </head>
 <body>
     <header>
+        <!-- Display current page name or default title -->
         <h1>{{ current_page.name if current_page else page_title | default("Control Board") }}</h1>
     </header>
 
     <main class="container">
         {% if error %}
+            <!-- Display an error message if passed from the route -->
             <div class="error-message">{{ error }}</div>
         {% elif current_page and current_page.buttons %}
+            <!-- Main button grid area -->
             <div 
                 class="button-grid" 
-		{% if current_page.layout == 'grid' %}
+                {% if current_page.layout == 'grid' and current_page.grid_columns %}
                     style="grid-template-columns: repeat({{ current_page.grid_columns }}, 1fr);"
                 {% endif %}
             >
+                {# Loop through buttons for the current page and include the button partial #}
                 {% for button in current_page.buttons %}
-                    {% with button=button, request=request %}
+                    {% with button=button, request=request %} {# Pass button and request context to the partial #}
                         {% include "partials/button.html" %}
                     {% endwith %}
                 {% endfor %}
             </div>
         {% elif current_page %}
-             <p>No buttons configured for page: {{ current_page.name }}.</p>
+             <!-- Message if the current page has no buttons configured -->
+             <p>No buttons configured for page: '{{ current_page.name }}'.</p>
+             <p>Please check your <code>ui_config.yaml</code>.</p>
         {% else %}
+            <!-- Fallback message if no page or buttons are available -->
             <p>No page or buttons configured to display.</p>
-            <p>Please ensure <code>ui_config.yaml</code> is correctly formatted.
+            <p>Please ensure your <code>ui_config.yaml</code> is correctly set up.
             The application looks for configurations in <code>user_config/</code> at the project root first,
             then falls back to <code>config_examples/</code>. Check server logs for more details if issues persist.
             </p>
@@ -43,53 +52,49 @@
 
     <footer>
         <p>Visual Control Board</p>
-        <!-- Area for toast messages / feedback -->
+        <!-- Container for toast messages / feedback -->
+        <!-- HTMX Out-of-Band swaps will target a div with id="toast-message" inside this container. -->
         <div id="toast-container">
             <!-- 
-                This div will be the target for Out-of-Band swaps of toast messages.
-                The toast.html partial defines a div with id="toast-message" and hx-swap-oob="true".
-                HTMX will swap the content of an existing #toast-message div if present,
-                or effectively insert it if the JS removes the previous one.
-                We add an empty div here to ensure the first toast has a target for replacement.
+                Initial placeholder for the toast message.
+                The `partials/toast.html` defines a div with `id="toast-message"` and `hx-swap-oob="true"`.
+                When a toast is triggered, HTMX will replace this div (or the one from a previous toast)
+                with the new toast content.
             -->
             <div id="toast-message"></div>
         </div>
     </footer>
 
     <script>
-        // This script handles the auto-hiding of toast messages.
-        // For more complex JavaScript, consider moving this to a separate file in static/js/.
+        // JavaScript for managing toast message display and auto-hide.
+        // This script listens for HTMX swap events to handle new toasts.
         document.body.addEventListener('htmx:afterSwap', function(event) {
-            // Check if the swapped content includes our toast structure.
-            // The OOB swap targets #toast-container by placing a div with id="toast-message" inside it,
-            // or rather, it swaps an existing #toast-message element.
+            // Find the toast element by its ID. HTMX OOB swap replaces the element with this ID.
             const toastElement = document.getElementById('toast-message'); 
             
+            // Check if the toast element exists, has the 'show' class, and contains actual content.
             if (toastElement && toastElement.classList.contains('show') && toastElement.textContent.trim() !== '') {
-                // Check textContent to ensure it's not the initial empty placeholder
+                // Automatically hide the toast after a delay.
                 setTimeout(() => {
-                    toastElement.classList.remove('show');
-                    // Optional: remove the element after fade out to keep DOM clean if many toasts appear
-                    // and to ensure subsequent toasts with the same ID are correctly handled.
-                    // This also means the next toast (which is a div with id="toast-message") will be "newly" inserted.
+                    toastElement.classList.remove('show'); // Trigger fade-out animation (CSS transition).
+                    
+                    // After the fade-out animation completes, clear the toast content
+                    // to prepare it for a potential next OOB swap.
+                    // This ensures the #toast-message div remains in the DOM as a target.
                     setTimeout(() => {
-                        if (toastElement.parentElement) {
-                            // Check if it's still the same element before removing,
-                            // in case a new toast replaced it quickly.
-                            const currentToast = document.getElementById('toast-message');
-                            if (currentToast === toastElement) {
-                                // Instead of removing, let's clear its content and hide it,
-                                // so it remains a target for the next OOB swap.
-                                // currentToast.remove(); 
-                                currentToast.innerHTML = ''; // Clear content
-                                currentToast.classList.remove('toast', 'show', 'error'); // Reset classes
-                            }
+                        // Double-check if the element still exists and is the one we hid.
+                        const currentToast = document.getElementById('toast-message');
+                        if (currentToast === toastElement && !currentToast.classList.contains('show')) {
+                            currentToast.innerHTML = ''; // Clear its content.
+                            // Remove styling classes to reset its appearance for the next toast.
+                            // The 'toast' class itself might be re-added by the partial,
+                            // but 'error' or other specific styles should be cleared.
+                            currentToast.classList.remove('error'); // Remove 'error' if it was an error toast.
+                            // Note: The 'toast' class itself is part of the structure from toast.html,
+                            // so it will be re-applied by the next OOB swap.
                         }
-                    }, 500); // Match CSS transition duration for fade-out
-                }, 3000); // Hide after 3 seconds
-            } else if (toastElement && toastElement.textContent.trim() === '' && !toastElement.classList.contains('show')) {
-                // This is likely the initial empty placeholder, do nothing or ensure it's hidden.
-                // It should not have 'show' class initially.
+                    }, 500); // This duration should match the CSS opacity transition duration (0.5s).
+                }, 3000); // Display toast for 3 seconds before starting to hide.
             }
         });
     </script>
