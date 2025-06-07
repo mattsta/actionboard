@@ -108,7 +108,9 @@ function updateButtonContent(data) {
 
     const buttonElement = document.getElementById(`btn-${buttonId}`);
     if (!buttonElement) {
-        console.warn(`Button element with id 'btn-${buttonId}' not found for update.`);
+        // This is an expected scenario if the button is on a page that is not currently visible.
+        // The warning is removed to avoid cluttering the console for this normal behavior.
+        // console.warn(`Button element with id 'btn-${buttonId}' not found for update.`); 
         return;
     }
 
