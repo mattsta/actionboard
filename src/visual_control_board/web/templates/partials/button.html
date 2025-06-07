@@ -1,0 +1,14 @@
+{# Renders a single button. Expects `button` (ButtonConfig) and `request` (FastAPI Request) in context. #}
+<button
+    class="control-button {{ button.style_class | default('') }}"
+    id="btn-{{ button.id }}"
+    hx-post="{{ url_for('handle_button_action', button_id=button.id) }}"
+    hx-swap="outerHTML" {# Default swap, can be overridden or used with hx-target #}
+    {# hx-target="#toast-container" hx-swap="beforeend" #} {# Example: if action returns a toast message #}
+    title="{{ button.text }}"
+>
+    {% if button.icon_class %}
+        <i class="{{ button.icon_class }}"></i>
+    {% endif %}
+    <span class="button-text">{{ button.text }}</span>
+</button>
