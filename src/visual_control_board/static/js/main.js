@@ -51,6 +51,54 @@ function connectWebSocket() {
     };
 }
 
+function renderSparkline(svgElement, sparklinePayload) {
+    if (!svgElement || !sparklinePayload || !sparklinePayload.data || sparklinePayload.data.length < 2) {
+        svgElement.innerHTML = ''; // Clear if no data or not enough data
+        return;
+    }
+
+    const data = sparklinePayload.data;
+    const color = sparklinePayload.color || "currentColor";
+    const strokeWidth = sparklinePayload.stroke_width || 1.5;
+    
+    // Use the viewBox from the SVG element itself (e.g., "0 0 100 25")
+    const viewBoxParts = svgElement.getAttribute('viewBox').split(' ').map(Number);
+    const vbX = viewBoxParts[0];
+    const vbY = viewBoxParts[1];
+    const vbWidth = viewBoxParts[2];
+    const vbHeight = viewBoxParts[3];
+
+    const minVal = Math.min(...data);
+    const maxVal = Math.max(...data);
+    const range = maxVal - minVal;
+
+    // Handle case where all data points are the same (range is 0)
+    const yNormalizer = range === 0 
+        ? (val) => vbY + vbHeight / 2  // Draw a flat line in the middle
+        : (val) => vbY + vbHeight - ((val - minVal) / range) * vbHeight; // Invert Y for SVG
+
+    const points = data.map((val, index) => {
+        const x = vbX + (index / (data.length - 1)) * vbWidth;
+        const y = yNormalizer(val);
+        return `${x},${y}`;
+    });
+
+    const pathD = "M " + points.join(" L ");
+
+    // Clear previous paths
+    svgElement.innerHTML = ''; 
+
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", pathD);
+    path.setAttribute("stroke", color);
+    path.setAttribute("stroke-width", strokeWidth.toString());
+    path.setAttribute("fill", "none");
+    path.setAttribute("vector-effect", "non-scaling-stroke"); // Keeps stroke width consistent on resize
+
+    svgElement.appendChild(path);
+}
+
+
 function updateButtonContent(data) {
     const buttonId = data.button_id;
     if (!buttonId) {
@@ -64,7 +112,41 @@ function updateButtonContent(data) {
         return;
     }
 
-    // Update text
+    const iconElement = buttonElement.querySelector('[data-role="button-icon"]');
+    const sparklineElement = buttonElement.querySelector('[data-role="button-sparkline"]');
+
+    // Handle Sparkline or Icon update (mutually exclusive)
+    if (data.sparkline && data.sparkline.data && data.sparkline.data.length > 0) {
+        if (iconElement) iconElement.style.display = 'none';
+        if (sparklineElement) {
+            sparklineElement.style.display = '';
+            renderSparkline(sparklineElement, data.sparkline);
+        }
+    } else if (typeof data.icon_class === 'string') {
+        if (sparklineElement) sparklineElement.style.display = 'none';
+        if (iconElement) {
+            if (data.icon_class) { // Non-empty string: set new icon
+                iconElement.className = data.icon_class; // Resets all classes then sets the new one
+                iconElement.style.display = ''; 
+            } else { // Empty string means remove/hide icon
+                iconElement.className = '';
+                iconElement.style.display = 'none'; 
+            }
+        }
+    } else if (data.hasOwnProperty('sparkline') && (data.sparkline === null || (data.sparkline.data && data.sparkline.data.length === 0))) {
+        // Explicitly clearing sparkline (e.g. by sending sparkline: null or sparkline: {data:[]})
+        if (sparklineElement) {
+            sparklineElement.style.display = 'none';
+            sparklineElement.innerHTML = ''; // Clear its content
+        }
+        // Optionally, restore a default icon or ensure icon is visible if no icon_class was provided to hide it
+        if (iconElement && !iconElement.className) { // If icon has no class, it might be hidden
+             // iconElement.style.display = 'none'; // Or set a default icon here
+        }
+    }
+
+
+    // Update text (independent of icon/sparkline)
     if (typeof data.text === 'string') {
         const textElement = buttonElement.querySelector('[data-role="button-text"]');
         if (textElement) {
@@ -72,33 +154,7 @@ function updateButtonContent(data) {
         } else {
             console.warn(`Text element not found for button 'btn-${buttonId}'.`);
         }
-    }
-
-    // Update icon
-    const iconElement = buttonElement.querySelector('[data-role="button-icon"]');
-    if (iconElement) {
-        if (typeof data.icon_class === 'string') {
-            if (data.icon_class) { // Non-empty string: set new icon
-                iconElement.className = data.icon_class;
-                iconElement.style.display = ''; // Ensure it's visible
-            } else { // Empty string or null means remove/hide icon
-                iconElement.className = '';
-                iconElement.style.display = 'none'; // Hide it
-            }
-        }
-    } else if (typeof data.icon_class === 'string' && data.icon_class) {
-        // If icon element doesn't exist but new icon_class is provided, create it
-        console.warn(`Icon element not found for button 'btn-${buttonId}', creating one.`);
-        const newIcon = document.createElement('i');
-        newIcon.setAttribute('data-role', 'button-icon');
-        newIcon.className = data.icon_class;
-        // Prepend to keep it before the text, similar to the template
-        const textSpan = buttonElement.querySelector('[data-role="button-text"]');
-        if (textSpan) {
-            buttonElement.insertBefore(newIcon, textSpan);
-        } else {
-            buttonElement.prepend(newIcon);
-        }
+        buttonElement.title = data.text; // Update title attribute for accessibility
     }
 
 
@@ -114,10 +170,6 @@ function updateButtonContent(data) {
         } else { // Empty string or null means remove custom style (revert to default)
             buttonElement.dataset.currentStyleClass = ""; // Clear stored style
         }
-    }
-     // Update title attribute if text changed (useful for accessibility and tooltips)
-    if (typeof data.text === 'string') {
-        buttonElement.title = data.text;
     }
 }
 
