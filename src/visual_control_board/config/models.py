@@ -106,3 +106,11 @@ class ActionsConfig(BaseModel):
     """Root configuration model for all available actions."""
     actions: List[ActionDefinition] = Field(..., description="List of all action definitions available to the application.")
 
+
+class DynamicUpdateConfig(BaseModel):
+    """
+    Model for receiving a full UI and Actions configuration update via API.
+    This allows external services to propose a new set of configurations.
+    """
+    ui_config: UIConfig = Field(..., description="The complete new UI configuration.")
+    actions_config: ActionsConfig = Field(..., description="The complete new Actions configuration.")

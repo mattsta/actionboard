@@ -1,0 +1,32 @@
+{# Renders a banner if a configuration update is pending. #}
+{# Expects `pending_update_available` (boolean) in context. #}
+{# This partial is targeted by OOB swaps from /api/v1/config/stage and /api/v1/config/discard #}
+
+{% if pending_update_available %}
+<div id="update-banner" class="update-banner-content" hx-swap-oob="true">
+    <p>
+        <strong>Update Available:</strong> A new board configuration has been staged.
+    </p>
+    <button
+        hx-post="{{ url_for('apply_staged_configuration') }}"
+        {# On successful apply, the server sends HX-Refresh: true, so no hx-target needed here for page reload #}
+        class="button-apply-update"
+    >
+        Apply Update
+    </button>
+    <button
+        hx-post="{{ url_for('discard_staged_configuration') }}"
+        hx-target="#update-notification-area" {# Target the container #}
+        hx-swap="innerHTML" {# Replace the content of the container with the response (which will be this partial, re-rendered as hidden) #}
+        class="button-discard-update"
+    >
+        Discard
+    </button>
+</div>
+{% else %}
+{# If no update is pending, render an empty div or a hidden placeholder to be targeted by OOB swaps #}
+{# This ensures the target for hx-swap-oob="true" from /stage always exists and can be replaced #}
+<div id="update-banner" hx-swap-oob="true">
+    <!-- No update pending -->
+</div>
+{% endif %}

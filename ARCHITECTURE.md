@@ -4,96 +4,78 @@ This document outlines the architecture of the Visual Control Board application.
 
 ## Overview
 
-The Visual Control Board is a web application designed to provide a customizable, grid-based interface of buttons. Clicking a button on the web UI triggers a predefined action on the server. The system emphasizes configurability and extensibility, allowing users to define their own UI layouts and backend actions through simple YAML files.
+The Visual Control Board is a web application designed to provide a customizable, grid-based interface of buttons. Clicking a button on the web UI triggers a predefined action on the server. The system emphasizes configurability and extensibility, allowing users to define their own UI layouts and backend actions through simple YAML files for initial setup, and programmatically via an API for dynamic updates during runtime.
 
 It leverages:
--   **Python** as the primary programming language.
--   **FastAPI** as the high-performance web framework for the backend API and serving HTML.
--   **HTMX** for enhancing HTML to create dynamic frontend interactions with minimal custom JavaScript.
--   **Jinja2** for server-side HTML templating.
--   **YAML** for human-readable configuration files (UI layout and action definitions).
--   **Pydantic** for data validation, parsing, and settings management of configuration files.
--   **`uv`** for project dependency management and virtual environments.
+-   **Python**, **FastAPI**, **HTMX**, **Jinja2**, **YAML**, **Pydantic**, and **`uv`**.
 
 ## Core Components
 
-The application is structured into several key components:
-
 1.  **Configuration System (`src/visual_control_board/config`, `project_root/user_config/`, `project_root/config_examples/`)**
-    *   **Pydantic Models (`models.py` in `src/visual_control_board/config`):** These define the expected structure and data types for configuration files (e.g., `UIConfig`, `PageConfig`, `ButtonConfig`, `ActionsConfig`, `ActionDefinition`). They provide robust validation and parsing of YAML data.
-    *   **Configuration Loader (`loader.py` in `src/visual_control_board/config`):** The `ConfigLoader` class is responsible for:
-        *   Reading `ui_config.yaml` and `actions_config.yaml`.
-        *   Implementing a fallback strategy: It first attempts to load configurations from the `user_config/` directory (located at the project root, e.g., `project_root/user_config/ui_config.yaml`). This directory is intended for user-specific overrides and customizations.
-        *   If configuration files are not found in `user_config/`, or if that directory doesn't exist, the loader falls back to using the default/example configurations packaged with the application in the `config_examples/` directory (e.g., `project_root/config_examples/ui_config.yaml`). This ensures the application can run out-of-the-box with sensible defaults.
-    *   **User Override Configuration Files (`project_root/user_config/`):** This optional directory, typically created and managed by the user at the project root, can contain:
-        *   `ui_config.yaml`: Defines the user's custom layout of pages, buttons (including text, icons, styles), and the `action_id` they trigger.
-        *   `actions_config.yaml`: Defines the user's custom mappings from an `action_id` to a specific Python function (module and function name).
-    *   **Default/Example Configuration Files (`project_root/config_examples/`):** These are provided as part of the application. They serve as runnable defaults if no user configurations are found and also act as templates for users wishing to create their own `user_config/` files.
+    *   **Pydantic Models (`models.py`):** Define structures for `UIConfig`, `ActionsConfig`, `ButtonConfig`, etc., and a `DynamicUpdateConfig` for API-based updates.
+    *   **Configuration Loader (`loader.py`):** Handles loading initial configurations from files (`user_config/` then `config_examples/`) at startup.
+    *   **Configuration Files:** YAML files for default and user-override initial setups.
 
 2.  **Action Management (`src/visual_control_board/actions`)**
-    *   **Built-in Actions (`built_in_actions.py`):** A collection of predefined Python functions that can be triggered by buttons (e.g., logging time, greeting a user). These serve as examples and can be used directly.
-    *   **Action Registry (`registry.py`):** The `ActionRegistry` class is responsible for:
-        *   Discovering and dynamically loading action functions based on the definitions in the loaded `actions_config.yaml`.
-        *   Executing actions when requested, handling both synchronous and asynchronous (async/await) Python functions. It passes parameters defined in `ui_config.yaml` (`action_params`) to the target function.
+    *   **Built-in Actions (`built_in_actions.py`):** Example Python functions.
+    *   **Action Registry (`registry.py`):** Dynamically loads and executes action functions based on the *current* `ActionsConfig`. It is re-initialized when new configurations are applied.
 
 3.  **Web Interface & API (`src/visual_control_board/web`, `src/visual_control_board/main.py`)**
-    *   **Main Application (`main.py` in `src/visual_control_board/`):** Initializes the FastAPI application.
-        *   On application startup (`@app.on_event("startup")`), it uses `ConfigLoader` to load all configurations and `ActionRegistry` to prepare all defined actions. These are stored in `app.state` for access via dependency injection.
-        *   It mounts directories for static assets (CSS, client-side JS if any).
-        *   It includes the API router for web endpoints.
-    *   **API Routes (`routes.py` in `src/visual_control_board/web`):** Defines HTTP endpoints using FastAPI's `APIRouter`.
-        *   `/` (GET): Serves the main HTML page, dynamically rendered using Jinja2 templates and the loaded `UIConfig`.
-        *   `/action/{button_id}` (POST): Handles button click events sent by HTMX. It identifies the action, executes it via the `ActionRegistry`, and returns an HTML partial response (often including an updated button state and an out-of-band toast message for feedback).
-    *   **Dependencies (`dependencies.py` in `src/visual_control_board/`):** FastAPI dependency functions that provide access to shared application state like the loaded `UIConfig`, `ActionsConfig`, and the `ActionRegistry` instance to route handlers.
-    *   **HTML Templates (`templates/` in `src/visual_control_board/web`):** Jinja2 templates for rendering the main page (`index.html`) and partials (e.g., `button.html`, `toast.html`) used by HTMX for dynamic updates.
-    *   **Static Assets (`static/` in `src/visual_control_board/`):** Contains CSS stylesheets (`style.css`) and potentially client-side JavaScript files or images.
+    *   **Main Application (`main.py`):** Initializes FastAPI.
+        *   On startup, loads initial configs and sets up application state (`app.state`) to hold:
+            *   `current_ui_config`, `current_actions_config`: The active configurations.
+            *   `staged_ui_config`, `staged_actions_config`: Configurations pending user approval via API.
+            *   `action_registry`: Instance for the current actions.
+            *   `pending_update_available`: Boolean flag.
+    *   **API Routes (`routes.py`):**
+        *   Standard UI routes (`/`, `/action/{button_id}`).
+        *   **Dynamic Configuration API (`/api/v1/config/` prefix):**
+            *   `POST /stage`: Accepts a `DynamicUpdateConfig`. Validates (including action loadability check using a temporary `ActionRegistry`) and stages it. Returns an HTMX OOB swap to show an "Update Available" banner.
+            *   `POST /apply`: Promotes staged configurations to current, re-initializes the main `ActionRegistry`, clears staged data, and sends `HX-Refresh: true` to clients.
+            *   `POST /discard`: Clears staged configurations and updates the banner via OOB swap.
+    *   **Dependencies (`dependencies.py`):** Provide access to `current_ui_config`, `current_actions_config`, `action_registry`, and `pending_update_available` flag.
+    *   **HTML Templates (`templates/`):**
+        *   `index.html`: Main page, includes an area for an `update_banner.html` partial.
+        *   `partials/button.html`, `partials/toast.html`.
+        *   `partials/update_banner.html`: Displays "Update Available" message with Apply/Discard buttons, managed via HTMX OOB swaps.
+    *   **Static Assets (`static/`):** CSS, etc. Includes styles for the update banner.
 
-## Data Flow (Example: Button Click)
+## Data Flow: Dynamic Configuration Update
 
-1.  **Application Startup:**
-    *   `main.py` initializes `ConfigLoader` and `ActionRegistry`.
-    *   Configurations (`ui_config.yaml`, `actions_config.yaml`) are loaded (user overrides first, then examples).
-    *   Actions are registered from `actions_config.yaml`.
-2.  **User Interaction:**
-    *   User navigates to the root URL (`/`).
-    *   `routes.py` serves `index.html`, rendered with data from `UIConfig` (e.g., the first page and its buttons).
-    *   User clicks a button on the web page.
-3.  **HTMX Request:**
-    *   The button (an HTML `<button>` element) has HTMX attributes (e.g., `hx-post="/action/{button_id}"`).
-    *   HTMX sends an asynchronous POST request to the specified URL (e.g., `/action/greet_dev_button`).
-4.  **Backend Processing:**
-    *   FastAPI routes the request to the `handle_button_action` function in `routes.py`.
-    *   Dependencies provide the `UIConfig` and `ActionRegistry` to the route handler.
-    *   The handler uses `button_id` to find the `ButtonConfig` in `UIConfig`, retrieving its `action_id` and `action_params`.
-    *   `ActionRegistry.execute_action(action_id, action_params)` is called.
-    *   The `ActionRegistry` looks up the Python function associated with `action_id` and executes it (synchronously or asynchronously) with the provided `action_params`.
-5.  **Response Generation:**
-    *   The action function returns a result (typically a dictionary with `status` and `message`).
-    *   The `handle_button_action` route handler uses this result to prepare an HTML response. This response usually includes:
-        *   The re-rendered HTML for the button itself (for `hx-swap="outerHTML"`).
-        *   An out-of-band (OOB) swapped HTML snippet for a toast notification (e.g., `partials/toast.html`) to provide feedback.
-6.  **Frontend Update:**
-    *   HTMX receives the HTML response.
-    *   It swaps the original button with its new version from the response.
-    *   It processes any OOB swaps, inserting the toast message into the designated container (`#toast-container`).
-    *   The user sees the updated UI (e.g., button might appear pressed/reset, toast message appears).
+1.  **External Request:** An external service sends a `POST` request to `/api/v1/config/stage` with a JSON payload containing new `ui_config` and `actions_config`.
+2.  **Staging & Validation:**
+    *   The `stage_new_configuration` route handler in `routes.py` receives the request.
+    *   Pydantic validates the structure of the incoming `DynamicUpdateConfig`.
+    *   A temporary `ActionRegistry` is used to attempt loading actions from the proposed `actions_config`. If any actions fail to load (e.g., module/function not found), a `400 Bad Request` is returned.
+    *   If all validations pass, the `ui_config` and `actions_config` are stored in `app.state.staged_ui_config` and `app.state.staged_actions_config`. `app.state.pending_update_available` is set to `True`.
+3.  **UI Notification:**
+    *   The `/stage` endpoint returns an HTML partial (`update_banner.html` rendered with `pending_update_available=True`) with `hx-swap-oob="true"`.
+    *   HTMX on the client side swaps this banner into the `#update-notification-area` (or a specific `#update-banner` div) in `index.html`. The user now sees "Update Available" with "Apply" and "Discard" buttons.
+4.  **User Action (Apply):**
+    *   User clicks the "Apply" button.
+    *   HTMX sends a `POST` request to `/api/v1/config/apply`.
+    *   The `apply_staged_configuration` route handler:
+        *   Moves data from `app.state.staged_...` to `app.state.current_...`.
+        *   Creates a new `ActionRegistry` instance, loads actions from the new `current_actions_config`, and updates `app.state.action_registry`.
+        *   Resets `app.state.staged_...` to `None` and `pending_update_available` to `False`.
+        *   Returns a response with the `HX-Refresh: true` header.
+5.  **Client Refresh:** HTMX processes `HX-Refresh: true`, causing a full reload of the web page. The `get_index_page` route now serves content based on the new `current_ui_config`.
+6.  **User Action (Discard):**
+    *   User clicks the "Discard" button.
+    *   HTMX sends a `POST` request to `/api/v1/config/discard`.
+    *   The `discard_staged_configuration` route handler:
+        *   Resets `app.state.staged_...` to `None` and `pending_update_available` to `False`.
+        *   Returns an HTML partial (`update_banner.html` rendered with `pending_update_available=False`) with `hx-swap-oob="true"`, effectively hiding or clearing the banner.
 
 ## Extensibility
 
-*   **Adding New Buttons/Pages:**
-    *   Primarily involves modifying `ui_config.yaml` (preferably your copy in `user_config/`). Define new `PageConfig` or `ButtonConfig` entries following the Pydantic models.
-*   **Adding New Actions:**
-    1.  Write a new Python function (synchronous or asynchronous) in `src/visual_control_board/actions/built_in_actions.py` or your own custom Python module within the project.
-    2.  Register this new function in `actions_config.yaml` (preferably your copy in `user_config/`) by adding a new `ActionDefinition` entry (specifying `id`, `module`, and `function`).
-    3.  Reference the new action `id` in your `ui_config.yaml` under the desired button's `action_id` field.
-*   **Custom Styling:** Modify `src/visual_control_board/static/css/style.css` or add new CSS files and link them in `index.html`. Button-specific styles can be applied using the `style_class` property in `ButtonConfig`.
+*   **Adding New Buttons/Pages/Actions (Initial):** Via YAML files in `user_config/` or `config_examples/`.
+*   **Updating Configuration (Runtime):** Via the `/api/v1/config/stage` API endpoint.
+*   **Custom Styling:** Via `style.css`.
 
 ## Future Considerations (Potential Features)
 
-*   **Multi-Page Navigation:** The current system loads all pages from `UIConfig` but primarily displays the first one. True navigation between multiple defined pages would require frontend and backend changes (e.g., route parameters for page ID, navigation controls).
-*   **Dynamic Button Content Updates:** The `ButtonConfig` includes a `dynamic_content_url` field. A future enhancement could involve client-side JavaScript polling this URL or server-side push mechanisms (e.g., WebSockets) to update button text, icons, or styles in real-time based on external system states.
-*   **Sequence/Tree of Actions:** The current model supports one `action_id` per button. A more advanced feature would be to allow a button to trigger a defined sequence of actions, or a conditional tree of actions. This would require changes to `ButtonConfig` and `ActionRegistry` logic.
-*   **More Sophisticated Layouts:** Beyond the current grid layout, support for other layout systems (e.g., flexbox configurations, user-defined dashboards) could be added.
-*   **User Authentication & Authorization:** For environments requiring secure access, implementing user login and permissions for accessing the control board or specific actions.
-*   **Configuration via UI:** Allowing users to modify parts of the configuration through the web interface itself, rather than just YAML files.
-*   **Enhanced Action Parameter Typing:** While `ButtonActionParams` is flexible, actions requiring specific typed parameters could benefit from a system where Pydantic models for parameters are more directly tied to action definitions for automatic validation.
+*   **Live Button Content Updates (Streaming):** Implement WebSocket endpoint for real-time updates to individual button faces (text, icons, styles) from external data feeds. This would involve client-side JS/HTMX WebSocket handling.
+*   **More Granular API Updates:** APIs to update specific pages or buttons instead of the entire configuration.
+*   **Authentication/Authorization:** Secure the dynamic configuration API endpoints.
+*   **Multi-Page Navigation.**

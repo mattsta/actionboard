@@ -17,6 +17,12 @@
         <h1>{{ current_page.name if current_page else page_title | default("Control Board") }}</h1>
     </header>
 
+    <!-- Area for update notifications -->
+    <div id="update-notification-area" class="update-notification-container">
+        {# The partials/update_banner.html will be rendered here by API calls or on initial load #}
+        {% include "partials/update_banner.html" with context %}
+    </div>
+
     <main class="container">
         {% if error %}
             <!-- Display an error message if passed from the route -->
@@ -52,49 +58,25 @@
 
     <footer>
         <p>Visual Control Board</p>
-        <!-- Container for toast messages / feedback -->
-        <!-- HTMX Out-of-Band swaps will target a div with id="toast-message" inside this container. -->
         <div id="toast-container">
-            <!-- 
-                Initial placeholder for the toast message.
-                The `partials/toast.html` defines a div with `id="toast-message"` and `hx-swap-oob="true"`.
-                When a toast is triggered, HTMX will replace this div (or the one from a previous toast)
-                with the new toast content.
-            -->
             <div id="toast-message"></div>
         </div>
     </footer>
 
     <script>
-        // JavaScript for managing toast message display and auto-hide.
-        // This script listens for HTMX swap events to handle new toasts.
         document.body.addEventListener('htmx:afterSwap', function(event) {
-            // Find the toast element by its ID. HTMX OOB swap replaces the element with this ID.
             const toastElement = document.getElementById('toast-message'); 
-            
-            // Check if the toast element exists, has the 'show' class, and contains actual content.
             if (toastElement && toastElement.classList.contains('show') && toastElement.textContent.trim() !== '') {
-                // Automatically hide the toast after a delay.
                 setTimeout(() => {
-                    toastElement.classList.remove('show'); // Trigger fade-out animation (CSS transition).
-                    
-                    // After the fade-out animation completes, clear the toast content
-                    // to prepare it for a potential next OOB swap.
-                    // This ensures the #toast-message div remains in the DOM as a target.
+                    toastElement.classList.remove('show'); 
                     setTimeout(() => {
-                        // Double-check if the element still exists and is the one we hid.
                         const currentToast = document.getElementById('toast-message');
                         if (currentToast === toastElement && !currentToast.classList.contains('show')) {
-                            currentToast.innerHTML = ''; // Clear its content.
-                            // Remove styling classes to reset its appearance for the next toast.
-                            // The 'toast' class itself might be re-added by the partial,
-                            // but 'error' or other specific styles should be cleared.
-                            currentToast.classList.remove('error'); // Remove 'error' if it was an error toast.
-                            // Note: The 'toast' class itself is part of the structure from toast.html,
-                            // so it will be re-applied by the next OOB swap.
+                            currentToast.innerHTML = ''; 
+                            currentToast.classList.remove('error'); 
                         }
-                    }, 500); // This duration should match the CSS opacity transition duration (0.5s).
-                }, 3000); // Display toast for 3 seconds before starting to hide.
+                    }, 500); 
+                }, 3000); 
             }
         });
     </script>

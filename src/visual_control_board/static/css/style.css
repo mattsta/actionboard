@@ -149,3 +149,55 @@ footer {
     border-radius: 5px;
     margin-bottom: 15px; /* Space below the error message */
 }
+
+/* --- Update Notification Banner Styling --- */
+.update-notification-container {
+    background-color: #fff3cd; /* Light yellow, common for warnings/info */
+    color: #856404; /* Dark yellow text */
+    border-bottom: 1px solid #ffeeba;
+    padding: 0; /* Padding will be on the inner content div */
+    text-align: center;
+    position: sticky; /* Makes it stick at the top */
+    top: 0;
+    z-index: 1050; /* Above most content, below modals if any */
+}
+
+.update-banner-content {
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px; /* Space between text and buttons */
+}
+
+.update-banner-content p {
+    margin: 0;
+}
+
+.update-banner-content button {
+    padding: 8px 15px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.button-apply-update {
+    background-color: #28a745; /* Green */
+    color: white;
+    border-color: #28a745;
+}
+.button-apply-update:hover {
+    background-color: #218838;
+    border-color: #1e7e34;
+}
+
+.button-discard-update {
+    background-color: #6c757d; /* Grey */
+    color: white;
+    border-color: #6c757d;
+}
+.button-discard-update:hover {
+    background-color: #5a6268;
+    border-color: #545b62;
+}
