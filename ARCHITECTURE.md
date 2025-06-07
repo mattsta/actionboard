@@ -69,11 +69,56 @@ It leverages:
 
 ## Data Flow: Live Button Content Update
 
-(This remains as previously described. Updates target buttons by ID; visibility depends on whether the button's page is currently active in the DOM.)
+1.  **WebSocket Connection Setup:**
+    *   User loads `index.html`.
+    *   Client-side JavaScript in `static/js/main.js` establishes a WebSocket connection to `/ws/button_updates`.
+    *   The `LiveUpdateManager` on the server accepts and stores this connection.
+2.  **External Trigger for Update:**
+    *   An external service (or an internal process) sends an HTTP `POST` request to `/api/v1/buttons/update_content`.
+    *   The request body contains a JSON payload matching `ButtonContentUpdate` (e.g., `{"button_id": "temp_sensor_1", "text": "23.5°C"}`).
+3.  **Backend Broadcast:**
+    *   The `push_button_content_update` route handler receives the payload.
+    *   It calls a method on the `LiveUpdateManager` (e.g., `broadcast_button_update`) with the update data.
+    *   The `LiveUpdateManager` iterates through all active WebSocket connections and sends a JSON message (e.g., `{"type": "button_content_update", "payload": {"button_id": "temp_sensor_1", "text": "23.5°C"}}`) to each.
+4.  **Client-Side DOM Update:**
+    *   The JavaScript in `static/js/main.js` (listening on the WebSocket) receives the message.
+    *   It parses the JSON data.
+    *   It finds the HTML element for the specified `button_id` (e.g., `<button id="btn-temp_sensor_1">...</button>`).
+    *   It updates the button's content directly in the DOM:
+        *   Changes the text of the `span[data-role="button-text"]`.
+        *   Updates the class of the `i[data-role="button-icon"]` or creates/removes it.
+        *   Modifies the `classList` of the main button element to reflect the new `style_class`, using `data-current-style-class` to manage the previous dynamic style.
+5.  **User Sees Live Change:** The button's appearance on the user's screen updates in real-time without a page reload.
 
 ## Data Flow: Dynamic Configuration Update (Full Board)
 
-(This remains as previously described, involving staging, applying, and client-side page refresh via `HX-Refresh` which reloads the entire application state including page navigation.)
+1.  **Staging a New Configuration:**
+    *   An external system (e.g., a script, another service, or a manual `curl` command) sends an HTTP `POST` request to `/api/v1/config/stage`.
+    *   The request body contains a JSON payload matching `DynamicUpdateConfig`, which includes both a full `ui_config` and `actions_config`.
+    *   The `stage_new_configuration` route handler:
+        *   Validates the new `actions_config` by attempting to load them into a temporary `ActionRegistry`. If any action fails to load (e.g., module not found, function not found), it returns an error.
+        *   If validation passes, stores the new `ui_config` and `actions_config` in `request.app.state.staged_ui_config` and `request.app.state.staged_actions_config`.
+        *   Sets `request.app.state.pending_update_available = True`.
+        *   Returns an HTML partial (`partials/update_banner.html`) indicating an update is available. This partial is swapped into the `#update-notification-area` on the client via HTMX's OOB swap.
+2.  **User Interaction with Update Banner:**
+    *   The user sees the banner with "Apply Update" and "Discard" buttons.
+3.  **Applying the Staged Configuration:**
+    *   User clicks "Apply Update".
+    *   HTMX sends a `POST` request to `/api/v1/config/apply`.
+    *   The `apply_staged_configuration` route handler:
+        *   Moves the configurations from `staged_*` to `current_*` in `app.state`.
+        *   Re-initializes the main `app.state.action_registry` with the new `current_actions_config`.
+        *   Clears the `staged_*` configurations and sets `pending_update_available = False`.
+        *   Returns a response with the `HX-Refresh: true` header.
+4.  **Client-Side Page Refresh:**
+    *   HTMX detects the `HX-Refresh: true` header and performs a full page reload.
+    *   The application now serves content based on the new `current_ui_config` and uses the updated `action_registry`. The page navigation structure will also be updated.
+5.  **Discarding the Staged Configuration:**
+    *   User clicks "Discard".
+    *   HTMX sends a `POST` request to `/api/v1/config/discard`.
+    *   The `discard_staged_configuration` route handler:
+        *   Clears the `staged_*` configurations and sets `pending_update_available = False`.
+        *   Returns an HTML partial (`partials/update_banner.html` rendered as hidden) to clear the banner from the UI.
 
 ## Extensibility
 
