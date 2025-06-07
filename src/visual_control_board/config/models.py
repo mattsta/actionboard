@@ -54,7 +54,7 @@ class ButtonConfig(BaseModel):
     
     dynamic_content_url: Optional[str] = Field(
         default=None, 
-        description="URL for dynamically fetching button content (e.g., text, icon). Future feature requiring client-side polling or server-side push."
+        description="URL for dynamically fetching button content (e.g., text, icon). Deprecated in favor of WebSocket updates."
     )
 
 class PageConfig(BaseModel):
@@ -114,3 +114,13 @@ class DynamicUpdateConfig(BaseModel):
     """
     ui_config: UIConfig = Field(..., description="The complete new UI configuration.")
     actions_config: ActionsConfig = Field(..., description="The complete new Actions configuration.")
+
+class ButtonContentUpdate(BaseModel):
+    """
+    Model for pushing live updates to a button's content via WebSocket.
+    All fields are optional; only provided fields will be updated.
+    """
+    button_id: str = Field(..., description="The ID of the button to update.")
+    text: Optional[str] = Field(default=None, description="New text for the button.")
+    icon_class: Optional[str] = Field(default=None, description="New FontAwesome icon class. Empty string or null to remove icon.")
+    style_class: Optional[str] = Field(default=None, description="New custom CSS class for styling. Empty string or null to remove custom style.")

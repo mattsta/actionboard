@@ -9,8 +9,7 @@ from .config.loader import ConfigLoader
 from .config.models import UIConfig, ActionsConfig 
 from .actions.registry import ActionRegistry
 from .web import routes as web_routes
-# Dependencies are used by routes, not directly in main usually, but good to be aware of them.
-# from .dependencies import get_ui_config, get_actions_config, get_action_registry
+from .live_updates import LiveUpdateManager # Added import
 
 # --- Logging Setup ---
 logging.basicConfig(
@@ -26,8 +25,8 @@ package_base_dir = Path(__file__).parent.resolve()
 
 app = FastAPI(
     title="Visual Control Board",
-    description="A web-based visual control board for triggering custom actions, with dynamic update capabilities.",
-    version="0.1.1" # Incremented version for new feature
+    description="A web-based visual control board for triggering custom actions, with dynamic update and live streaming capabilities.",
+    version="0.1.2" # Incremented version for new feature
 )
 
 app.mount(
@@ -42,7 +41,7 @@ app.include_router(web_routes.router)
 async def startup_event():
     """
     Application startup event handler.
-    Initializes configurations and action registry.
+    Initializes configurations, action registry, and live update manager.
     Sets up state for current and potentially staged configurations.
     """
     logger.info("Application starting up...")
@@ -58,6 +57,10 @@ async def startup_event():
     app.state.staged_ui_config: Optional[UIConfig] = None
     app.state.staged_actions_config: Optional[ActionsConfig] = None
     app.state.pending_update_available: bool = False
+
+    # Initialize Live Update Manager
+    app.state.live_update_manager = LiveUpdateManager()
+    logger.info("LiveUpdateManager created and stored in app.state.")
 
     # Critical check: Initial UI Configuration must be loaded.
     if app.state.current_ui_config is None:
@@ -87,5 +90,7 @@ async def shutdown_event():
     Application shutdown event handler.
     """
     logger.info("Application shutting down...")
+    # Potentially close WebSocket connections gracefully if manager supports it
+    # For now, connections will be closed by the server shutting down.
     logger.info("Application shutdown complete.")
 

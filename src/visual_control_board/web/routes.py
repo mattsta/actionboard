@@ -1,13 +1,20 @@
-from fastapi import APIRouter, Request, HTTPException, Depends, Response
+from fastapi import APIRouter, Request, HTTPException, Depends, Response, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
 from typing import Optional, Dict, Any
 import logging
+import json # For WebSocket message parsing if needed, though send_json/receive_json handle it
 
-from visual_control_board.config.models import UIConfig, ButtonConfig, PageConfig, DynamicUpdateConfig, ActionsConfig
+from visual_control_board.config.models import (
+    UIConfig, ButtonConfig, PageConfig, DynamicUpdateConfig, ActionsConfig, ButtonContentUpdate
+)
 from visual_control_board.actions.registry import ActionRegistry
-from visual_control_board.dependencies import get_ui_config, get_action_registry, get_pending_update_flag
+from visual_control_board.dependencies import (
+    get_ui_config, get_action_registry, get_pending_update_flag, get_live_update_manager
+)
+from visual_control_board.live_updates import LiveUpdateManager
+
 
 logger = logging.getLogger(__name__)
 
@@ -24,39 +31,13 @@ async def stage_new_configuration(
     request: Request,
     update_request: DynamicUpdateConfig
 ):
-    """
-    Stages a new UI and Actions configuration.
-    The new configuration is validated (including action loadability) but not applied immediately.
-    A notification banner will be shown in the UI to apply or discard.
-    """
     logger.info("Received request to stage new configuration.")
-
-    # Validate the new ActionsConfig by attempting to load actions into a temporary registry
     temp_action_registry = ActionRegistry()
-    # Capture logs from the temporary registry loading process to check for errors
-    # This is a simplified way; a more robust method might involve custom log handlers
-    # or checking the number of successfully loaded actions against definitions.
-    # For now, we assume `load_actions` logs errors for unresolvable actions.
-    # A more direct validation would be to check `len(temp_action_registry._actions)`
-    # against `len(update_request.actions_config.actions)`.
-    
-    # We need a way to check if temp_action_registry had issues.
-    # One simple way: count actions before and after.
-    # Or, `load_actions` could return a status or raise specific validation errors.
-    # For now, let's assume Pydantic validation of ActionDefinition is the primary check for structure.
-    # The dynamic import check is crucial.
-    
-    # Let's refine action validation:
-    # The ActionRegistry's load_actions logs errors but doesn't explicitly return them.
-    # We can count successfully loaded actions.
-    initial_action_count = len(temp_action_registry._actions)
     temp_action_registry.load_actions(update_request.actions_config)
     loaded_action_count = len(temp_action_registry._actions)
     defined_action_count = len(update_request.actions_config.actions)
 
     if loaded_action_count != defined_action_count:
-        # This implies some actions failed to load.
-        # More detailed error reporting would require `load_actions` to return status/errors.
         error_msg = (
             f"Failed to stage new configuration: Not all actions could be loaded. "
             f"Defined: {defined_action_count}, Successfully Loaded: {loaded_action_count}. "
@@ -65,13 +46,11 @@ async def stage_new_configuration(
         logger.error(error_msg)
         raise HTTPException(status_code=400, detail=error_msg)
 
-    # If validation passes, store the new configurations in app.state
     request.app.state.staged_ui_config = update_request.ui_config
     request.app.state.staged_actions_config = update_request.actions_config
     request.app.state.pending_update_available = True
     logger.info("New configuration staged successfully.")
 
-    # Return HTML for the update banner using an OOB swap
     banner_html = templates.get_template("partials/update_banner.html").render({
         "request": request,
         "pending_update_available": True
@@ -81,10 +60,6 @@ async def stage_new_configuration(
 
 @config_router.post("/apply")
 async def apply_staged_configuration(request: Request, response: Response):
-    """
-    Applies the staged UI and Actions configuration, making it current.
-    Triggers a full page refresh on the client.
-    """
     logger.info("Received request to apply staged configuration.")
     if not request.app.state.pending_update_available or \
        request.app.state.staged_ui_config is None or \
@@ -92,52 +67,96 @@ async def apply_staged_configuration(request: Request, response: Response):
         logger.warning("No staged configuration available to apply.")
         raise HTTPException(status_code=404, detail="No staged configuration found to apply.")
 
-    # Apply the staged configurations
     request.app.state.current_ui_config = request.app.state.staged_ui_config
     request.app.state.current_actions_config = request.app.state.staged_actions_config
     
-    # Re-initialize the action registry with the new actions config
     new_action_registry = ActionRegistry()
     new_action_registry.load_actions(request.app.state.current_actions_config)
     request.app.state.action_registry = new_action_registry
     logger.info("Action registry re-initialized with new configuration.")
 
-    # Clear staged configurations and flag
     request.app.state.staged_ui_config = None
     request.app.state.staged_actions_config = None
     request.app.state.pending_update_available = False
     logger.info("Staged configuration applied and cleared.")
 
-    # Instruct HTMX to do a full page refresh
     response.headers["HX-Refresh"] = "true"
-    return {"message": "Configuration applied successfully. Page will refresh."} # JSON response, HX-Refresh handles UI
+    return {"message": "Configuration applied successfully. Page will refresh."}
 
 
 @config_router.post("/discard")
 async def discard_staged_configuration(request: Request):
-    """
-    Discards any staged UI and Actions configuration.
-    Updates the UI to remove the 'update available' banner.
-    """
     logger.info("Received request to discard staged configuration.")
     request.app.state.staged_ui_config = None
     request.app.state.staged_actions_config = None
     request.app.state.pending_update_available = False
     logger.info("Staged configuration discarded.")
 
-    # Return HTML for an empty/hidden update banner
     banner_html = templates.get_template("partials/update_banner.html").render({
         "request": request,
         "pending_update_available": False
     })
     return HTMLResponse(content=banner_html)
 
+# API Router for live button content updates
+live_updates_router = APIRouter(prefix="/api/v1/buttons", tags=["Live Button Updates"])
+
+@live_updates_router.post("/update_content", status_code=200)
+async def push_button_content_update(
+    update_data: ButtonContentUpdate,
+    live_update_mgr: LiveUpdateManager = Depends(get_live_update_manager)
+):
+    """
+    Receives a request to update a button's content and broadcasts it via WebSocket.
+    """
+    logger.info(f"Received request to update content for button_id: {update_data.button_id}")
+    
+    # Here, you might want to validate if the button_id exists in the current_ui_config.
+    # For simplicity, we'll skip that for now and assume valid button_ids are sent.
+    # ui_config: Optional[UIConfig] = request.app.state.current_ui_config
+    # if ui_config and not ui_config.find_button_and_page(update_data.button_id):
+    #     logger.warning(f"Attempted to update content for non-existent button_id: {update_data.button_id}")
+    #     raise HTTPException(status_code=404, detail=f"Button with id '{update_data.button_id}' not found in current UI configuration.")
+
+    await live_update_mgr.broadcast_button_update(update_data.model_dump(exclude_none=True))
+    return {"message": "Button content update broadcasted.", "button_id": update_data.button_id}
+
+
+# WebSocket endpoint
+@router.websocket("/ws/button_updates")
+async def websocket_button_updates_endpoint(
+    websocket: WebSocket, 
+    live_update_mgr: LiveUpdateManager = Depends(get_live_update_manager)
+):
+    """
+    WebSocket endpoint for clients to receive live button content updates.
+    """
+    await live_update_mgr.connect(websocket)
+    try:
+        while True:
+            # Keep the connection alive. Clients primarily receive data.
+            # You could implement a ping/pong or receive messages from client if needed.
+            # For now, we just wait for disconnect.
+            # If client sends data, it would be `data = await websocket.receive_text()` or `receive_json()`
+            # This example doesn't expect client-to-server messages on this WS after connection.
+            await websocket.receive_text() # This will block until a message or disconnect
+            # If you expect messages, process them here. Otherwise, this is just to keep alive / detect close.
+            logger.debug(f"Received keep-alive or unexpected message from {websocket.client}")
+
+
+    except WebSocketDisconnect:
+        logger.info(f"WebSocket {websocket.client} disconnected.")
+    except Exception as e:
+        logger.error(f"Error in WebSocket connection {websocket.client}: {e}", exc_info=True)
+    finally:
+        live_update_mgr.disconnect(websocket)
+
 
 # Main UI routes
 @router.get("/", response_class=HTMLResponse)
 async def get_index_page(
     request: Request,
-    ui_config: Optional[UIConfig] = Depends(get_ui_config), # Uses updated get_ui_config
+    ui_config: Optional[UIConfig] = Depends(get_ui_config), 
     pending_update_available: bool = Depends(get_pending_update_flag)
 ):
     if not ui_config or not ui_config.pages:
@@ -149,7 +168,7 @@ async def get_index_page(
                 "page_title": "Error - Visual Control Board",
                 "current_page": None,
                 "error": "UI Configuration not found or is empty.",
-                "pending_update_available": pending_update_available # Pass flag even on error page
+                "pending_update_available": pending_update_available 
             },
             status_code=500
         )
@@ -172,7 +191,7 @@ async def get_index_page(
 async def handle_button_action(
     request: Request,
     button_id: str,
-    ui_config: Optional[UIConfig] = Depends(get_ui_config), # Uses updated get_ui_config
+    ui_config: Optional[UIConfig] = Depends(get_ui_config), 
     action_registry: ActionRegistry = Depends(get_action_registry)
 ):
     if not ui_config:
@@ -229,5 +248,6 @@ async def handle_button_action(
     final_html_content = toast_html + button_html
     return HTMLResponse(content=final_html_content)
 
-# Include the config_router in the main app router
+# Include the sub-routers in the main app router
 router.include_router(config_router)
+router.include_router(live_updates_router)

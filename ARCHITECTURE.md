@@ -4,78 +4,77 @@ This document outlines the architecture of the Visual Control Board application.
 
 ## Overview
 
-The Visual Control Board is a web application designed to provide a customizable, grid-based interface of buttons. Clicking a button on the web UI triggers a predefined action on the server. The system emphasizes configurability and extensibility, allowing users to define their own UI layouts and backend actions through simple YAML files for initial setup, and programmatically via an API for dynamic updates during runtime.
+The Visual Control Board is a web application designed to provide a customizable, grid-based interface of buttons. Clicking a button on the web UI triggers a predefined action on the server. The system emphasizes configurability and extensibility. Initial UI and action definitions are loaded from YAML files, and the entire configuration can be dynamically updated via an API. Furthermore, individual button content (text, icon, style) can be updated in real-time via WebSockets.
 
 It leverages:
--   **Python**, **FastAPI**, **HTMX**, **Jinja2**, **YAML**, **Pydantic**, and **`uv`**.
+-   **Python**, **FastAPI**, **HTMX**, **Jinja2**, **YAML**, **Pydantic**, **WebSockets**, and **`uv`**.
 
 ## Core Components
 
 1.  **Configuration System (`src/visual_control_board/config`, `project_root/user_config/`, `project_root/config_examples/`)**
-    *   **Pydantic Models (`models.py`):** Define structures for `UIConfig`, `ActionsConfig`, `ButtonConfig`, etc., and a `DynamicUpdateConfig` for API-based updates.
-    *   **Configuration Loader (`loader.py`):** Handles loading initial configurations from files (`user_config/` then `config_examples/`) at startup.
-    *   **Configuration Files:** YAML files for default and user-override initial setups.
+    *   **Pydantic Models (`models.py`):** Define structures for `UIConfig`, `ActionsConfig`, `ButtonConfig`, `DynamicUpdateConfig` (for full config updates), and `ButtonContentUpdate` (for live individual button updates).
+    *   **Configuration Loader (`loader.py`):** Handles loading initial configurations from files at startup.
 
 2.  **Action Management (`src/visual_control_board/actions`)**
     *   **Built-in Actions (`built_in_actions.py`):** Example Python functions.
-    *   **Action Registry (`registry.py`):** Dynamically loads and executes action functions based on the *current* `ActionsConfig`. It is re-initialized when new configurations are applied.
+    *   **Action Registry (`registry.py`):** Dynamically loads and executes action functions. Re-initialized when new full configurations are applied.
 
-3.  **Web Interface & API (`src/visual_control_board/web`, `src/visual_control_board/main.py`)**
+3.  **Live Update Management (`src/visual_control_board/live_updates.py`)**
+    *   **`LiveUpdateManager`:** A class responsible for managing active WebSocket connections. It handles client connections/disconnections and provides a method to broadcast messages (typically JSON payloads for button content updates) to all connected clients. Stored in `app.state`.
+
+4.  **Web Interface & API (`src/visual_control_board/web`, `src/visual_control_board/main.py`)**
     *   **Main Application (`main.py`):** Initializes FastAPI.
-        *   On startup, loads initial configs and sets up application state (`app.state`) to hold:
-            *   `current_ui_config`, `current_actions_config`: The active configurations.
-            *   `staged_ui_config`, `staged_actions_config`: Configurations pending user approval via API.
-            *   `action_registry`: Instance for the current actions.
-            *   `pending_update_available`: Boolean flag.
+        *   On startup, loads initial configs, sets up `app.state` (for current/staged configs, action registry), and instantiates the `LiveUpdateManager`.
     *   **API Routes (`routes.py`):**
         *   Standard UI routes (`/`, `/action/{button_id}`).
-        *   **Dynamic Configuration API (`/api/v1/config/` prefix):**
-            *   `POST /stage`: Accepts a `DynamicUpdateConfig`. Validates (including action loadability check using a temporary `ActionRegistry`) and stages it. Returns an HTMX OOB swap to show an "Update Available" banner.
-            *   `POST /apply`: Promotes staged configurations to current, re-initializes the main `ActionRegistry`, clears staged data, and sends `HX-Refresh: true` to clients.
-            *   `POST /discard`: Clears staged configurations and updates the banner via OOB swap.
-    *   **Dependencies (`dependencies.py`):** Provide access to `current_ui_config`, `current_actions_config`, `action_registry`, and `pending_update_available` flag.
+        *   **Dynamic Configuration API (`/api/v1/config/` prefix):** For staging and applying full UI/action configuration updates (see previous descriptions).
+        *   **Live Button Update API (`/api/v1/buttons/` prefix):**
+            *   `POST /update_content`: Accepts a `ButtonContentUpdate` payload. Uses the `LiveUpdateManager` to broadcast this update to all connected WebSocket clients.
+        *   **WebSocket Endpoint (`/ws/button_updates`):**
+            *   Clients connect here to receive live updates. The `LiveUpdateManager` handles these connections.
+    *   **Dependencies (`dependencies.py`):** Provide access to configurations, action registry, pending update flag, and the `LiveUpdateManager`.
     *   **HTML Templates (`templates/`):**
-        *   `index.html`: Main page, includes an area for an `update_banner.html` partial.
-        *   `partials/button.html`, `partials/toast.html`.
-        *   `partials/update_banner.html`: Displays "Update Available" message with Apply/Discard buttons, managed via HTMX OOB swaps.
-    *   **Static Assets (`static/`):** CSS, etc. Includes styles for the update banner.
+        *   `index.html`: Main page. Includes JavaScript to establish a WebSocket connection, listen for messages, and dynamically update button DOM elements based on received data.
+        *   `partials/button.html`: Modified to include `data-` attributes for easier JS targeting of text, icon, and style properties.
+        *   Other partials (`toast.html`, `update_banner.html`).
+    *   **Static Assets (`static/`):** CSS, etc.
 
-## Data Flow: Dynamic Configuration Update
+## Data Flow: Live Button Content Update
 
-1.  **External Request:** An external service sends a `POST` request to `/api/v1/config/stage` with a JSON payload containing new `ui_config` and `actions_config`.
-2.  **Staging & Validation:**
-    *   The `stage_new_configuration` route handler in `routes.py` receives the request.
-    *   Pydantic validates the structure of the incoming `DynamicUpdateConfig`.
-    *   A temporary `ActionRegistry` is used to attempt loading actions from the proposed `actions_config`. If any actions fail to load (e.g., module/function not found), a `400 Bad Request` is returned.
-    *   If all validations pass, the `ui_config` and `actions_config` are stored in `app.state.staged_ui_config` and `app.state.staged_actions_config`. `app.state.pending_update_available` is set to `True`.
-3.  **UI Notification:**
-    *   The `/stage` endpoint returns an HTML partial (`update_banner.html` rendered with `pending_update_available=True`) with `hx-swap-oob="true"`.
-    *   HTMX on the client side swaps this banner into the `#update-notification-area` (or a specific `#update-banner` div) in `index.html`. The user now sees "Update Available" with "Apply" and "Discard" buttons.
-4.  **User Action (Apply):**
-    *   User clicks the "Apply" button.
-    *   HTMX sends a `POST` request to `/api/v1/config/apply`.
-    *   The `apply_staged_configuration` route handler:
-        *   Moves data from `app.state.staged_...` to `app.state.current_...`.
-        *   Creates a new `ActionRegistry` instance, loads actions from the new `current_actions_config`, and updates `app.state.action_registry`.
-        *   Resets `app.state.staged_...` to `None` and `pending_update_available` to `False`.
-        *   Returns a response with the `HX-Refresh: true` header.
-5.  **Client Refresh:** HTMX processes `HX-Refresh: true`, causing a full reload of the web page. The `get_index_page` route now serves content based on the new `current_ui_config`.
-6.  **User Action (Discard):**
-    *   User clicks the "Discard" button.
-    *   HTMX sends a `POST` request to `/api/v1/config/discard`.
-    *   The `discard_staged_configuration` route handler:
-        *   Resets `app.state.staged_...` to `None` and `pending_update_available` to `False`.
-        *   Returns an HTML partial (`update_banner.html` rendered with `pending_update_available=False`) with `hx-swap-oob="true"`, effectively hiding or clearing the banner.
+1.  **Client Connection:**
+    *   User loads `index.html`.
+    *   Client-side JavaScript establishes a WebSocket connection to `/ws/button_updates`.
+    *   The `LiveUpdateManager` on the server accepts and stores this connection.
+2.  **External Trigger for Update:**
+    *   An external service (or an internal process) sends an HTTP `POST` request to `/api/v1/buttons/update_content`.
+    *   The request body contains a JSON payload matching `ButtonContentUpdate` (e.g., `{"button_id": "temp_sensor_1", "text": "23.5°C"}`).
+3.  **Backend Broadcast:**
+    *   The `push_button_content_update` route handler receives the payload.
+    *   It calls a method on the `LiveUpdateManager` (e.g., `broadcast_button_update`) with the update data.
+    *   The `LiveUpdateManager` iterates through all active WebSocket connections and sends a JSON message (e.g., `{"type": "button_content_update", "payload": {"button_id": "temp_sensor_1", "text": "23.5°C"}}`) to each.
+4.  **Client-Side DOM Update:**
+    *   The JavaScript in `index.html` (listening on the WebSocket) receives the message.
+    *   It parses the JSON data.
+    *   It finds the HTML element for the specified `button_id` (e.g., `<button id="btn-temp_sensor_1">...</button>`).
+    *   It updates the button's content directly in the DOM:
+        *   Changes the text of the `span[data-role="button-text"]`.
+        *   Updates the class of the `i[data-role="button-icon"]` or creates/removes it.
+        *   Modifies the `classList` of the main button element to reflect the new `style_class`, using `data-current-style-class` to manage the previous dynamic style.
+5.  **User Sees Live Change:** The button's appearance on the user's screen updates in real-time without a page reload.
+
+## Data Flow: Dynamic Configuration Update (Full Board)
+
+(This remains as previously described, involving staging, applying, and client-side page refresh via `HX-Refresh`.)
 
 ## Extensibility
 
-*   **Adding New Buttons/Pages/Actions (Initial):** Via YAML files in `user_config/` or `config_examples/`.
-*   **Updating Configuration (Runtime):** Via the `/api/v1/config/stage` API endpoint.
+*   **Adding New Buttons/Pages/Actions (Initial):** Via YAML files.
+*   **Updating Full Configuration (Runtime):** Via the `/api/v1/config/stage` API.
+*   **Pushing Live Button Content:** Via the `/api/v1/buttons/update_content` API.
 *   **Custom Styling:** Via `style.css`.
 
-## Future Considerations (Potential Features)
+## Future Considerations
 
-*   **Live Button Content Updates (Streaming):** Implement WebSocket endpoint for real-time updates to individual button faces (text, icons, styles) from external data feeds. This would involve client-side JS/HTMX WebSocket handling.
-*   **More Granular API Updates:** APIs to update specific pages or buttons instead of the entire configuration.
-*   **Authentication/Authorization:** Secure the dynamic configuration API endpoints.
-*   **Multi-Page Navigation.**
+*   **WebSocket Authentication/Authorization:** Secure the WebSocket endpoint if sensitive data is involved or if updates should be restricted.
+*   **Scalability of `LiveUpdateManager`:** For a large number of connections, the in-memory list in `LiveUpdateManager` might become a bottleneck. Consider using a message broker like Redis Pub/Sub for broadcasting in such scenarios.
+*   **More Sophisticated Client-Side State Management:** For very complex UIs with many live-updating elements, a more structured client-side approach (e.g., a minimal JavaScript framework or state management library) might be beneficial, though the goal here is to keep client-side JS light.

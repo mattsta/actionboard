@@ -2,12 +2,19 @@
 <button
     class="control-button {{ button.style_class | default('') }}"
     id="btn-{{ button.id }}"
+    data-button-id="{{ button.id }}" {# Explicit data attribute for easier JS selection if needed #}
+    data-current-style-class="{{ button.style_class | default('') }}" {# Store current style for JS updates #}
     hx-post="{{ url_for('handle_button_action', button_id=button.id) }}"
     hx-swap="outerHTML" {# Replaces the button itself with the response from this POST #}
     title="{{ button.text }}"
 >
     {% if button.icon_class %}
-        <i class="{{ button.icon_class }}"></i>
+        <i class="{{ button.icon_class }}" data-role="button-icon"></i>
+    {% else %}
+        {# Ensure an <i> tag exists if we might add an icon later, or handle creation in JS #}
+        {# For simplicity, let's assume JS will create it if needed, or ensure one is always there if preferred #}
+        {# Adding an empty one with data-role for consistent targeting by JS #}
+        <i data-role="button-icon" style="display: none;"></i> 
     {% endif %}
-    <span class="button-text">{{ button.text }}</span>
+    <span class="button-text" data-role="button-text">{{ button.text }}</span>
 </button>
