@@ -124,7 +124,7 @@ function updateButtonContent(data) {
 function refreshNavigationPanel() {
     const navElement = document.getElementById('page-navigation');
     if (!navElement) {
-        console.error("Navigation element '#page-navigation' not found in DOM.");
+        console.error("Navigation element '#page-navigation' not found in DOM for refresh trigger.");
         return;
     }
 
@@ -140,8 +140,20 @@ function refreshNavigationPanel() {
     
     // Use HTMX's JavaScript API to request and swap the navigation content
     htmx.ajax('GET', refreshUrl, {
-        target: '#page-navigation',
-        swap: 'outerHTML' // Replace the entire <nav> element
+        target: '#page-navigation', // The element to be replaced
+        swap: 'outerHTML'          // Replace the entire <nav> element
+    }).then(() => {
+        // After the swap, the original #page-navigation element is gone, 
+        // and a new one (from the response) has taken its place.
+        // We need to tell HTMX to process this new element.
+        const newNavElement = document.getElementById('page-navigation');
+        if (newNavElement) {
+            htmx.process(newNavElement);
+            console.log("Explicitly processed new #page-navigation element with HTMX.");
+        } else {
+            // This case should ideally not happen if the server correctly returns a <nav id="page-navigation">...</nav>
+            console.error("#page-navigation element not found after outerHTML swap. This is unexpected.");
+        }
     }).catch(error => {
         console.error("Error refreshing navigation panel:", error);
     });
