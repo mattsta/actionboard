@@ -42,8 +42,11 @@ class ButtonConfig(BaseModel):
     text: str = Field(..., description="Text displayed on the button.")
     icon_class: Optional[str] = Field(
         default=None,
-        description="CSS class for an icon (e.g., FontAwesome 'fas fa-rocket').",
+        description="CSS class for an icon (e.g., FontAwesome 'fas fa-rocket'). Mutually exclusive with sparkline.",
     )
+    # Placeholder for future static sparkline configuration if needed
+    # sparkline_config: Optional[SparklineStaticConfig] = Field(default=None, description="Static configuration for a sparkline.")
+
     style_class: Optional[str] = Field(
         default=None,
         description="Custom CSS class for additional button styling (e.g., 'button-primary', 'button-danger').",
@@ -168,19 +171,35 @@ class DynamicUpdateConfig(BaseModel):
     )
 
 
+class SparklinePayload(BaseModel):
+    """Payload for updating a button with a sparkline."""
+    data: List[float] = Field(..., description="List of numerical data points for the sparkline.")
+    color: Optional[str] = Field(
+        default="currentColor", 
+        description="CSS color string for the sparkline. Defaults to the button's text color."
+    )
+    stroke_width: Optional[float] = Field(default=1.5, description="Stroke width for the sparkline.")
+    # view_box: Optional[str] = Field(default="0 0 100 30", description="SVG viewBox attribute.") # Keep fixed in JS for now
+
+
 class ButtonContentUpdate(BaseModel):
     """
     Model for pushing live updates to a button's content via WebSocket.
     All fields are optional; only provided fields will be updated.
+    If 'sparkline' is provided, 'icon_class' is typically ignored or cleared by the client.
     """
 
     button_id: str = Field(..., description="The ID of the button to update.")
     text: Optional[str] = Field(default=None, description="New text for the button.")
     icon_class: Optional[str] = Field(
         default=None,
-        description="New FontAwesome icon class. Send an empty string ('') to remove/hide the current icon.",
+        description="New FontAwesome icon class. Send an empty string ('') to remove/hide the current icon. If 'sparkline' is also sent, this might be ignored or used as fallback if sparkline data is empty.",
     )
     style_class: Optional[str] = Field(
         default=None,
         description="New custom CSS class for styling. Send an empty string ('') to remove the current custom style and revert to default button styling.",
+    )
+    sparkline: Optional[SparklinePayload] = Field(
+        default=None, 
+        description="Data and configuration for rendering a sparkline on the button. If provided, typically replaces the icon."
     )

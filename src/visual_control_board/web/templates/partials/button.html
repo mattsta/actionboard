@@ -8,13 +8,19 @@
     hx-swap="none" {# Changed from outerHTML to none. Prevents button re-render, OOB swaps (like toast) still work. #}
     title="{{ button.text }}"
 >
-    {% if button.icon_class %}
-        <i class="{{ button.icon_class }}" data-role="button-icon"></i>
-    {% else %}
-        {# Ensure an <i> tag exists if we might add an icon later, or handle creation in JS #}
-        {# For simplicity, let's assume JS will create it if needed, or ensure one is always there if preferred #}
-        {# Adding an empty one with data-role for consistent targeting by JS #}
-        <i data-role="button-icon" style="display: none;"></i> 
-    {% endif %}
+    {# Container for icon or sparkline, helps with spacing if text is also present #}
+    <div class="button-graphic-area">
+        {# Icon element - will be hidden if sparkline is active #}
+        <i class="{{ button.icon_class if button.icon_class else '' }}" 
+           data-role="button-icon" 
+           style="{{ 'display: none;' if not button.icon_class and not True }}"></i> {# Default to display:none if no icon_class, but JS will manage #}
+
+        {# SVG Sparkline element - will be hidden if icon is active #}
+        {# Fixed viewBox for now. Adjust dimensions as needed. Height is smaller to act like an "icon". #}
+        <svg data-role="button-sparkline" 
+             viewBox="0 0 100 25" 
+             preserveAspectRatio="none" 
+             style="display: none; width: 100%; height: 25px; margin-bottom: 5px;"></svg>
+    </div>
     <span class="button-text" data-role="button-text">{{ button.text }}</span>
 </button>
