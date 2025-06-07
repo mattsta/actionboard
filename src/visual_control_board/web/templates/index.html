@@ -25,7 +25,9 @@
                 {% endif %}
             >
                 {% for button in current_page.buttons %}
-                    {% include "partials/button.html" with button=button request=request %}
+                    {% with button=button, request=request %}
+                        {% include "partials/button.html" %}
+                    {% endwith %}
                 {% endfor %}
             </div>
         {% elif current_page %}
