@@ -6,8 +6,11 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Default path relative to the 'src/visual_control_board' directory
-DEFAULT_CONFIG_DIR = Path(__file__).parent.parent / "user_config"
+# Default path relative to the project root directory
+# Assuming loader.py is in src/visual_control_board/config/
+# Path(__file__).parent.parent.parent.parent gives the project root
+PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
+DEFAULT_CONFIG_DIR = PROJECT_ROOT / "user_config"
 DEFAULT_UI_CONFIG_FILE = DEFAULT_CONFIG_DIR / "ui_config.yaml"
 DEFAULT_ACTIONS_CONFIG_FILE = DEFAULT_CONFIG_DIR / "actions_config.yaml"
 
@@ -80,12 +83,12 @@ class ConfigLoader:
 
 if __name__ == "__main__":
     # This block is for standalone testing of the ConfigLoader.
-    # It requires dummy config files to be present.
+    # It requires dummy config files to be present in the project_root/user_config directory.
     logging.basicConfig(level=logging.INFO)
     logger.info("Running ConfigLoader standalone test...")
 
-    # Ensure user_config directory exists for the test
-    test_config_dir = Path(__file__).parent.parent / "user_config"
+    # Ensure user_config directory exists at the project root for the test
+    test_config_dir = PROJECT_ROOT / "user_config"
     test_config_dir.mkdir(parents=True, exist_ok=True)
     
     dummy_ui_path = test_config_dir / "ui_config.yaml"

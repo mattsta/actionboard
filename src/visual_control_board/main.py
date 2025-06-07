@@ -45,20 +45,21 @@ async def startup_event():
     logger.info("Application starting up...")
 
     # Initialize and load configurations
-    config_loader_instance = ConfigLoader() # Defaults to src/visual_control_board/user_config/
+    # ConfigLoader now defaults to 'user_config/' at the project root.
+    config_loader_instance = ConfigLoader() 
     config_loader_instance.load_configs()
 
     app.state.ui_config = config_loader_instance.ui_config
     app.state.actions_config = config_loader_instance.actions_config
 
     if app.state.ui_config is None:
-        logger.critical("CRITICAL: Failed to load UI configuration. Check paths and file content.")
+        logger.critical("CRITICAL: Failed to load UI configuration. Check paths and file content in project_root/user_config/.")
         raise RuntimeError("Failed to load UI configuration. Application cannot start.")
     else:
         logger.info("UI configuration loaded successfully.")
 
     if app.state.actions_config is None:
-        logger.critical("CRITICAL: Failed to load Actions configuration. Check paths and file content.")
+        logger.critical("CRITICAL: Failed to load Actions configuration. Check paths and file content in project_root/user_config/.")
         raise RuntimeError("Failed to load Actions configuration. Application cannot start.")
     else:
         logger.info("Actions configuration loaded successfully.")
@@ -86,7 +87,9 @@ async def shutdown_event():
 # To run this app (from the project root directory):
 # 1. Ensure you have `uv` installed and a virtual environment set up and activated.
 # 2. Install dependencies: `uv pip install -e .[dev]`
-# 3. Copy example configs:
-#    cp config_examples/ui_config.yaml src/visual_control_board/user_config/
-#    cp config_examples/actions_config.yaml src/visual_control_board/user_config/
-# 4. Run: uvicorn src.visual_control_board.main:app --reload --host 0.0.0.0 --port 8000
+# 3. Create a 'user_config' directory at the project root if it doesn't exist:
+#    mkdir -p user_config
+# 4. Copy example configs to 'user_config/' at the project root:
+#    cp config_examples/ui_config.yaml user_config/
+#    cp config_examples/actions_config.yaml user_config/
+# 5. Run: uvicorn src.visual_control_board.main:app --reload --host 0.0.0.0 --port 8000

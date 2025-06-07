@@ -12,6 +12,7 @@ A web-based visual control board, inspired by devices like Elgato Stream Deck, b
 *   **Dependency Injection:** Core components like configuration and action registry are managed via FastAPI's dependency injection for better testability and maintainability.
 *   **Centralized Logging:** Standardized logging for application events.
 *   **`uv` Managed:** Uses `uv` for package management and virtual environments.
+*   **User-Managed Configurations:** Configuration files are stored in a `user_config/` directory at the project root, outside the main application package.
 
 ## Architecture
 
@@ -44,15 +45,18 @@ For a detailed understanding of the project's components and data flow, please r
     This installs the package in editable mode (`-e`) along with development dependencies.
 
 4.  **Set up User Configurations:**
-    *   The application expects configuration files in the `src/visual_control_board/user_config/` directory.
-    *   Copy the example configurations:
+    *   The application expects configuration files in a `user_config/` directory at the root of the project.
+    *   Create this directory if it doesn't exist:
         ```bash
-        cp config_examples/ui_config.yaml src/visual_control_board/user_config/
-        cp config_examples/actions_config.yaml src/visual_control_board/user_config/
+        mkdir -p user_config
         ```
-    *   Modify these copied files in `src/visual_control_board/user_config/` to customize your board. **Do not edit the files in `config_examples/` directly for your setup.**
+    *   Copy the example configurations from `config_examples/` to your new `user_config/` directory:
+        ```bash
+        cp config_examples/ui_config.yaml user_config/
+        cp config_examples/actions_config.yaml user_config/
+        ```
+    *   Modify these copied files in `user_config/` to customize your board. **Do not edit the files in `config_examples/` directly for your setup.**
 
 ## Running the Application
 
 Once the setup is complete, you can run the FastAPI application using Uvicorn:
-
