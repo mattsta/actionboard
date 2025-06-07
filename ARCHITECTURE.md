@@ -4,7 +4,7 @@ This document outlines the architecture of the Visual Control Board application.
 
 ## Overview
 
-The Visual Control Board is a web application designed to provide a customizable, grid-based interface of buttons. Users can navigate between multiple configured "pages" (tabs), each displaying its own set of buttons. Clicking a button on the web UI triggers a predefined action on the server. The system emphasizes configurability and extensibility. Initial UI (including page structures) and action definitions are loaded from YAML files, and the entire configuration can be dynamically updated via an API. Furthermore, individual button content (text, icon, style) can be updated in real-time via WebSockets.
+The Visual Control Board is a web application designed to provide a customizable, grid-based interface of buttons. Users can navigate between multiple configured "pages" (tabs), each displaying its own set of buttons. Clicking a button on the web UI triggers a predefined action on the server. The system emphasizes configurability and extensibility. Initial UI (including page structures) and action definitions are loaded from YAML files, and the entire configuration can be dynamically updated via an API. Furthermore, individual button content (text, icon, style) can be updated in real-time via WebSockets. Navigation tabs also update in real-time for all connected clients when the server configuration changes.
 
 It leverages:
 -   **Python**, **FastAPI**, **HTMX**, **Jinja2**, **YAML**, **Pydantic**, **WebSockets**, and **`uv`**.
@@ -20,7 +20,7 @@ It leverages:
     *   **Action Registry (`registry.py`):** Dynamically loads and executes action functions. Re-initialized when new full configurations are applied.
 
 3.  **Live Update Management (`src/visual_control_board/live_updates.py`)**
-    *   **`LiveUpdateManager`:** A class responsible for managing active WebSocket connections. It handles client connections/disconnections and provides a method to broadcast messages (typically JSON payloads for button content updates) to all connected clients. Stored in `app.state`.
+    *   **`LiveUpdateManager`:** A class responsible for managing active WebSocket connections. It handles client connections/disconnections and provides a method to broadcast messages (typically JSON payloads for button content updates or navigation update triggers) to all connected clients. Stored in `app.state`.
 
 4.  **Web Interface & API (`src/visual_control_board/web`, `src/visual_control_board/main.py`)**
     *   **Main Application (`main.py`):** Initializes FastAPI.
@@ -29,16 +29,17 @@ It leverages:
         *   **UI Routes:**
             *   `/` and `/page/{page_id}`: Serve the main HTML page, displaying the specified page's content (or the first page by default). Navigation between pages is handled via HTMX requests to `/content/page/{page_id}`.
             *   `/content/page/{page_id}`: An HTMX-specific endpoint that returns HTML partials for the selected page's button grid, updated navigation state, page title, and header.
+            *   `/content/navigation_panel`: An HTMX-specific endpoint that returns *only* the HTML for the navigation tabs. Used for live updates of the navigation area.
             *   `/action/{button_id}`: Handles button click actions.
         *   **Dynamic Configuration API (`/api/v1/config/` prefix):** For staging and applying full UI/action configuration updates.
         *   **Live Button Update API (`/api/v1/buttons/` prefix):**
             *   `POST /update_content`: Accepts a `ButtonContentUpdate` payload. Uses the `LiveUpdateManager` to broadcast this update to all connected WebSocket clients.
         *   **WebSocket Endpoint (`/ws/button_updates`):**
-            *   Clients connect here to receive live updates. The `LiveUpdateManager` handles these connections.
+            *   Clients connect here to receive live updates for button content and navigation changes. The `LiveUpdateManager` handles these connections.
     *   **Dependencies (`dependencies.py`):** Provide access to configurations, action registry, pending update flag, and the `LiveUpdateManager`.
     *   **HTML Templates (`templates/`):**
         *   `index.html`: Main page structure. Includes a navigation area (tabs) and a content area that's dynamically updated by HTMX.
-        *   `partials/nav.html`: Renders the navigation tabs.
+        *   `partials/nav.html`: Renders the navigation tabs. Includes `data-page-id` attributes on links for client-side identification.
         *   `partials/page_content.html`: Renders the button grid for a specific page.
         *   `partials/button.html`: Modified to include `data-` attributes for easier JS targeting of text, icon, and style properties.
         *   `partials/title_tag.html`, `partials/header_title_tag.html`: For OOB swapping of document title and H1 header.
@@ -84,41 +85,36 @@ It leverages:
     *   The JavaScript in `static/js/main.js` (listening on the WebSocket) receives the message.
     *   It parses the JSON data.
     *   It finds the HTML element for the specified `button_id` (e.g., `<button id="btn-temp_sensor_1">...</button>`).
-    *   It updates the button's content directly in the DOM:
-        *   Changes the text of the `span[data-role="button-text"]`.
-        *   Updates the class of the `i[data-role="button-icon"]` or creates/removes it.
-        *   Modifies the `classList` of the main button element to reflect the new `style_class`, using `data-current-style-class` to manage the previous dynamic style.
+    *   It updates the button's content directly in the DOM.
 5.  **User Sees Live Change:** The button's appearance on the user's screen updates in real-time without a page reload.
 
-## Data Flow: Dynamic Configuration Update (Full Board)
+## Data Flow: Dynamic Configuration Update (Full Board) & Live Navigation Update
 
-1.  **Staging a New Configuration:**
-    *   An external system (e.g., a script, another service, or a manual `curl` command) sends an HTTP `POST` request to `/api/v1/config/stage`.
-    *   The request body contains a JSON payload matching `DynamicUpdateConfig`, which includes both a full `ui_config` and `actions_config`.
-    *   The `stage_new_configuration` route handler:
-        *   Validates the new `actions_config` by attempting to load them into a temporary `ActionRegistry`. If any action fails to load (e.g., module not found, function not found), it returns an error.
-        *   If validation passes, stores the new `ui_config` and `actions_config` in `request.app.state.staged_ui_config` and `request.app.state.staged_actions_config`.
-        *   Sets `request.app.state.pending_update_available = True`.
-        *   Returns an HTML partial (`partials/update_banner.html`) indicating an update is available. This partial is swapped into the `#update-notification-area` on the client via HTMX's OOB swap.
-2.  **User Interaction with Update Banner:**
-    *   The user sees the banner with "Apply Update" and "Discard" buttons.
+1.  **Staging a New Configuration:** (Same as before)
+    *   External system `POST`s to `/api/v1/config/stage` with new `ui_config` and `actions_config`.
+    *   Server validates and stores them in `app.state.staged_*`.
+    *   `pending_update_available` is set to `True`.
+    *   Update banner HTML is returned to the initiating client.
+2.  **User Interaction with Update Banner:** (Same as before)
 3.  **Applying the Staged Configuration:**
-    *   User clicks "Apply Update".
-    *   HTMX sends a `POST` request to `/api/v1/config/apply`.
+    *   User (or script like `dynamic_board_controller.py`) triggers `POST` to `/api/v1/config/apply`.
     *   The `apply_staged_configuration` route handler:
-        *   Moves the configurations from `staged_*` to `current_*` in `app.state`.
-        *   Re-initializes the main `app.state.action_registry` with the new `current_actions_config`.
-        *   Clears the `staged_*` configurations and sets `pending_update_available = False`.
-        *   Returns a response with the `HX-Refresh: true` header.
-4.  **Client-Side Page Refresh:**
-    *   HTMX detects the `HX-Refresh: true` header and performs a full page reload.
-    *   The application now serves content based on the new `current_ui_config` and uses the updated `action_registry`. The page navigation structure will also be updated.
-5.  **Discarding the Staged Configuration:**
-    *   User clicks "Discard".
-    *   HTMX sends a `POST` request to `/api/v1/config/discard`.
-    *   The `discard_staged_configuration` route handler:
-        *   Clears the `staged_*` configurations and sets `pending_update_available = False`.
-        *   Returns an HTML partial (`partials/update_banner.html` rendered as hidden) to clear the banner from the UI.
+        *   Moves configurations from `staged_*` to `current_*`.
+        *   Re-initializes `action_registry`.
+        *   Clears staged configs and `pending_update_available`.
+        *   **Crucially, it now also calls `live_update_mgr.broadcast_json({"type": "navigation_update", "payload": {}})` to notify all connected WebSocket clients.**
+        *   For the client that made the `/apply` request (if it's a browser via the banner button), it returns a response with the `HX-Refresh: true` header.
+4.  **Client-Side Updates:**
+    *   **Initiating Client (via UI Banner):** Detects `HX-Refresh: true` and performs a full page reload. The reloaded page will have the new navigation and content.
+    *   **Other Connected Clients (and `dynamic_board_controller.py`'s effect on browsers):**
+        *   The JavaScript in `static/js/main.js` receives the `{"type": "navigation_update"}` WebSocket message.
+        *   The `refreshNavigationPanel()` JavaScript function is called.
+        *   This function determines the client's current active page ID from the DOM.
+        *   It makes an HTMX AJAX `GET` request to `/content/navigation_panel?active_page_id={id}`.
+        *   The server responds with the HTML for the updated navigation tabs, rendered with the correct active tab.
+        *   HTMX swaps this new HTML into the `#page-navigation` element.
+        *   Users on these clients see the navigation tabs update (e.g., new tab appears/disappears) without a full page reload.
+5.  **Discarding the Staged Configuration:** (Same as before)
 
 ## Extensibility
 
@@ -133,3 +129,4 @@ It leverages:
 *   **Scalability of `LiveUpdateManager`:** For a large number of connections, the in-memory list in `LiveUpdateManager` might become a bottleneck. Consider using a message broker like Redis Pub/Sub for broadcasting in such scenarios.
 *   **More Sophisticated Client-Side State Management:** For very complex UIs with many live-updating elements, a more structured client-side approach (e.g., a minimal JavaScript framework or state management library) might be beneficial, though the goal here is to keep client-side JS light.
 *   **Persistence of Current Page:** Currently, refreshing the browser will revert to the default page (or the page specified in the URL if `hx-push-url` is used effectively). User's last selected tab could be persisted (e.g., in localStorage or a cookie) for a more seamless experience across sessions, though this adds client-side complexity.
+*   **Content Sync on Nav Update:** If a live navigation update removes the currently viewed page for a client, its main content area won't automatically change until the user clicks a new tab. More sophisticated handling could redirect or clear content.

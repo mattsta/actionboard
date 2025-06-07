@@ -5,6 +5,7 @@
         {% for page in all_pages %}
         <li>
             <a href="{{ url_for('get_page_content', page_id=page.id) }}"
+               data-page-id="{{ page.id }}" {# Added data-page-id for JS #}
                class="nav-link {% if page.id == current_page_id %}active{% endif %}"
                hx-get="{{ url_for('get_page_content', page_id=page.id) }}"
                hx-push-url="{{ url_for('get_index_page_with_page_id', page_id=page.id) }}"

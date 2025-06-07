@@ -75,7 +75,11 @@ async def stage_new_configuration(
 
 
 @config_router.post("/apply")
-async def apply_staged_configuration(request: Request, response: Response):
+async def apply_staged_configuration(
+    request: Request, 
+    response: Response,
+    live_update_mgr: LiveUpdateManager = Depends(get_live_update_manager) # Added dependency
+):
     logger.info("Received request to apply staged configuration.")
     if (
         not request.app.state.pending_update_available
@@ -100,6 +104,13 @@ async def apply_staged_configuration(request: Request, response: Response):
     request.app.state.pending_update_available = False
     logger.info("Staged configuration applied and cleared.")
 
+    # Broadcast navigation update to all connected WebSocket clients
+    # This tells them to refresh their navigation panel.
+    await live_update_mgr.broadcast_json({"type": "navigation_update", "payload": {}})
+    logger.info("Broadcasted navigation_update message to WebSocket clients.")
+
+    # For the client that initiated this action (e.g., by clicking "Apply Update" button),
+    # trigger a full page refresh. Other clients will handle the WebSocket message.
     response.headers["HX-Refresh"] = "true"
     return {"message": "Configuration applied successfully. Page will refresh."}
 
@@ -154,7 +165,7 @@ async def websocket_button_updates_endpoint(
     ),  # Use the WebSocket-compatible dependency
 ):
     """
-    WebSocket endpoint for clients to receive live button content updates.
+    WebSocket endpoint for clients to receive live button content updates and other UI events.
     """
     await live_update_mgr.connect(
         websocket
@@ -307,14 +318,46 @@ async def get_page_content_partial(
     return HTMLResponse(content=full_response_content)
 
 
+@router.get("/content/navigation_panel", response_class=HTMLResponse, name="get_navigation_panel")
+async def get_navigation_panel_partial(
+    request: Request,
+    active_page_id: Optional[str] = None, # Client can suggest its current active page
+    ui_config: UIConfig = Depends(get_ui_config),
+    pending_update_available: bool = Depends(get_pending_update_flag),
+):
+    """
+    Renders and returns only the navigation panel HTML.
+    Used by client-side JS to refresh navigation via WebSocket trigger.
+    """
+    if not ui_config or not ui_config.pages:
+        # Return an empty nav or a specific message if no pages
+        return HTMLResponse(content='<nav id="page-navigation" class="nav-tabs" hx-swap-oob="true"><ul></ul></nav>')
+
+    current_page_id_for_nav = active_page_id
+    if active_page_id and not ui_config.find_page(active_page_id):
+        logger.warning(f"Requested active_page_id '{active_page_id}' for nav not found in current config. Defaulting.")
+        current_page_id_for_nav = None # Let template default or pick first
+
+    if not current_page_id_for_nav and ui_config.pages:
+        current_page_id_for_nav = ui_config.pages[0].id # Default to first page if none active or provided invalid
+
+    nav_html = templates.get_template("partials/nav.html").render({
+        "request": request,
+        "all_pages": ui_config.pages,
+        "current_page_id": current_page_id_for_nav,
+        "pending_update_available": pending_update_available
+    })
+    return HTMLResponse(content=nav_html)
+
+
 @router.post("/action/{button_id}", response_class=HTMLResponse)
 async def handle_button_action(
     request: Request,
     button_id: str,
-    ui_config: UIConfig = Depends(get_ui_config), # Changed from Optional
+    ui_config: UIConfig = Depends(get_ui_config), 
     action_registry: ActionRegistry = Depends(get_action_registry),
 ):
-    if not ui_config: # Should be caught by dependency if critical, but good check
+    if not ui_config: 
         logger.critical(f"UI Configuration not available for button ID: {button_id}.")
         error_message = "Critical Error: UI Configuration not loaded."
         toast_html = templates.get_template("partials/toast.html").render(
@@ -324,7 +367,6 @@ async def handle_button_action(
                 "toast_class": "toast show error",
             }
         )
-        # Return only toast as button context is missing
         return HTMLResponse(content=toast_html, status_code=500)
 
     found_config = ui_config.find_button_and_page(button_id)
@@ -339,11 +381,9 @@ async def handle_button_action(
                 "toast_class": "toast show error",
             }
         )
-        # Attempt to re-render the button if possible, or just send toast
-        # For now, just toast if button not found, as we can't re-render it.
         return HTMLResponse(content=toast_html)
 
-    _originating_page_config, button_config = found_config # _originating_page_config not used here
+    _originating_page_config, button_config = found_config 
     action_id = button_config.action_id
     action_params = button_config.action_params.model_dump()
 
@@ -378,11 +418,10 @@ async def handle_button_action(
             "toast_class": toast_class,
         }
     )
-    # Re-render the button itself (its state might not have changed, but this is standard practice)
     button_html = templates.get_template("partials/button.html").render(
         {
             "request": request,
-            "button": button_config, # Use the button_config from the current UIConfig
+            "button": button_config, 
         }
     )
     final_html_content = toast_html + button_html
@@ -392,10 +431,3 @@ async def handle_button_action(
 # Include the sub-routers in the main app router
 router.include_router(config_router)
 router.include_router(live_updates_router)
-
-# Need to create these simple partials for OOB title/header swaps
-# src/visual_control_board/web/templates/partials/title_tag.html
-# <title id="page-title" hx-swap-oob="true">{{ page_title }}</title>
-
-# src/visual_control_board/web/templates/partials/header_title_tag.html
-# <h1 id="page-header-title" hx-swap-oob="true">{{ header_title }}</h1>

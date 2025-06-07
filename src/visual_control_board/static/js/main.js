@@ -31,6 +31,9 @@ function connectWebSocket() {
             const message = JSON.parse(event.data);
             if (message.type === "button_content_update" && message.payload) {
                 updateButtonContent(message.payload);
+            } else if (message.type === "navigation_update") {
+                console.log("Navigation update message received. Refreshing navigation panel.");
+                refreshNavigationPanel();
             }
         } catch (e) {
             console.error("Error parsing WebSocket message or invalid message format:", e);
@@ -116,6 +119,32 @@ function updateButtonContent(data) {
     if (typeof data.text === 'string') {
         buttonElement.title = data.text;
     }
+}
+
+function refreshNavigationPanel() {
+    const navElement = document.getElementById('page-navigation');
+    if (!navElement) {
+        console.error("Navigation element '#page-navigation' not found in DOM.");
+        return;
+    }
+
+    let activePageId = '';
+    const activeLink = navElement.querySelector('.nav-link.active');
+    if (activeLink && activeLink.dataset.pageId) {
+        activePageId = activeLink.dataset.pageId;
+    }
+    
+    const refreshUrl = `/content/navigation_panel${activePageId ? '?active_page_id=' + encodeURIComponent(activePageId) : ''}`;
+    
+    console.log(`Requesting navigation refresh from: ${refreshUrl}`);
+    
+    // Use HTMX's JavaScript API to request and swap the navigation content
+    htmx.ajax('GET', refreshUrl, {
+        target: '#page-navigation',
+        swap: 'outerHTML' // Replace the entire <nav> element
+    }).catch(error => {
+        console.error("Error refreshing navigation panel:", error);
+    });
 }
 
 // Initialize WebSocket connection when the page loads
